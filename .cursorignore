@@ -1,0 +1,114 @@
+# Local development environment
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Package and build artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+*.so
+*.pyd
+
+# Tool caches (redirected to scratch/cache/)
+.nox/
+.cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test and temp files (use scratch/agent/ instead)
+test_env/
+test_*.py
+*.tmp
+*.temp
+test-reports/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter and notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs and debug
+*.log
+logs/
+
+# Local development files
+local_*
+
+# Data and model files
+*.h5ad
+*.h5mu
+*.h5
+*.pkl
+*.parquet
+*.pt
+*.ckpt
+*.csv
+*.db
+*.sqlite
+
+# Project specific
+data/
+scratch/
+temp/
+build/
+version.env
+
+# Ignore all files in these directories (they should be in scratch/)
+.cursor/
+.maromo/
+.pixi/
+.wandb/
+wandb/
+
+# Keep the scratch directory structure but ignore all contents
+scratch/*
+!scratch/.gitkeep
+!scratch/agent/
+!scratch/cache/
+!scratch/repos/
+!scratch/temp/
+
+# Ignore lock files but keep them in version control
+*.lock
+!pixi.lock
+!uv.lock
+
+# Ignore node_modules but keep package.json
+node_modules/
+!package.json
+!tsconfig.json
+
+# Ignore documentation builds
+docs/_build/
+docs/.doctrees/

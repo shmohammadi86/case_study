@@ -1,0 +1,156 @@
+# Ruff configuration: https://docs.astral.sh/ruff/configuration/
+# This configuration is designed to enforce modern Python best practices.
+
+# Exclude common directories and generated files from linting and formatting.
+exclude = [
+    ".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".ipynb_checkpoints",
+    ".mypy_cache", ".nox", ".pants.d", ".pyenv", ".pytest_cache", ".pytype",
+    ".ruff_cache", ".svn", ".tox", ".venv", ".vscode", "__pypackages__",
+    "_build", "buck-out", "build", "dist", "node_modules", "site-packages", "venv",
+    # Backup and archive directories
+    "**/backup/**", "**/archive/**", "**/scratch/**",
+    "**/*_backup.py", "**/*_old.py", "**/*.deprecated",
+]
+force-exclude = true
+respect-gitignore = true
+
+# Cache directory for ruff in scratch folder.
+cache-dir = "scratch/cache/ruff"
+
+# Define the source directories.
+src = ["src", "tests"]
+
+# Project settings
+line-length = 119
+indent-width = 4
+target-version = "py312"
+
+# Lint configuration (flat schema for compatibility with older validators)
+# Essential rules for high-quality code, focusing on correctness and maintainability
+# See: https://docs.astral.sh/ruff/rules/
+select = [
+    "E",   # pycodestyle errors (syntax, indentation, etc.)
+    "F",   # pyflakes (undefined names, unused imports, etc.)
+    "W",   # pycodestyle warnings (whitespace, etc.)
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade (modern Python syntax)
+    "B",   # flake8-bugbear (likely bugs and design problems)
+    "C4",  # flake8-comprehensions (better list/dict comprehensions)
+    "PIE", # flake8-pie (unnecessary code)
+    "RSE", # flake8-raise (better exception handling)
+    "RUF", # ruff-specific rules (ruff improvements)
+    "S",   # flake8-bandit (security issues) - selective
+    "PT",  # flake8-pytest-style (better pytest usage)
+    "PL",  # pylint (selected rules only)
+]
+
+# Ignore rules that are overly subjective, conflict with other tools, or inappropriate for this codebase
+ignore = [
+    # Complexity rules - too subjective for research/ML code
+    "PLR0913",  # too-many-arguments
+    "PLR0912",  # too-many-branches  
+    "PLR0915",  # too-many-statements
+    "PLR0911",  # too-many-returns
+    "C901",     # complex-structure (mccabe will handle this)
+    "PLR2004",  # magic-value-comparison
+    
+    # Security rules - too restrictive for research code
+    "S101",     # assert (fine in tests and research code)
+    "S301",     # pickle usage (common in ML)
+    "S311",     # pseudo-random generators (fine for non-crypto)
+    "S603",     # subprocess-popen-with-shell-equals-true
+    "S607",     # start-process-with-partial-path
+    
+    # Import and naming rules - too restrictive
+    "TID252",   # relative imports (acceptable in packages)
+    "N812",     # lowercase-imported-as-non-lowercase (common in ML: import torch.nn as nn)
+    "N999",     # invalid-module-name (external code)
+    "PLC0415",  # import-outside-toplevel (acceptable in functions)
+    
+    # Style rules that conflict with formatter or are subjective
+    "E501",     # line-too-long (handled by formatter)
+    "RUF015",   # unnecessary-iterable-allocation-for-first-element
+    "B006",     # mutable-default-argument (acceptable in some contexts)
+    "E731",     # lambda-assignment (acceptable for simple cases)
+    
+    # Variable and loop rules - too restrictive
+    "PLW2901",  # redefined-loop-name
+    "B007",     # unused-loop-control-variable
+    "F841",     # unused-variable (acceptable with underscore prefix)
+    
+    # String and character rules
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode characters
+    
+    # Temporary ignores for legacy code - can be addressed incrementally
+    "F821",     # undefined-name (needs careful review)
+    "F822",     # undefined-export (needs __all__ fixes)
+    "B018",     # useless-expression (needs review)
+    "S110",     # try-except-pass (needs proper exception handling)
+    "S104",     # hardcoded-bind-all-interfaces (needs review)
+    "S307",     # suspicious-eval-usage (needs review)
+    "S310",     # suspicious-url-open-usage (needs review)
+    "S602",     # subprocess-popen-with-shell-equals-true (needs review)
+    "DTZ005",   # call-datetime-now-without-tzinfo (needs review)
+    "N816",     # mixed-case-variable-in-global-scope (needs review)
+    "D106",     # undocumented-public-nested-class (needs review)
+    "PLW0127",  # self-assigning-variable (needs review)
+    "F706",     # return-outside-function (syntax error - needs fix)
+    "F811",     # redefined-while-unused (needs review)
+    "RUF022",   # unnecessary-iterable-allocation-for-first-element
+]
+
+# Allow all fixable rules to be autofixed.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[pydocstyle]
+# Use the Google docstring convention.
+convention = "google"
+
+[mccabe]
+# Set a reasonable complexity limit for research/ML code
+max-complexity = 15
+
+[per-file-ignores]
+# Test files - more lenient rules
+"tests/*" = [
+    "S101",    # assert statements are fine in tests
+    "PLR2004", # magic values are fine in tests
+    "PLC0415", # imports in functions are fine in tests
+    "PLR0915", # too many statements are fine in tests
+    "PLR0912", # too many branches are fine in tests
+    "PLR0913", # too many arguments are fine in tests
+    "F401",    # unused imports are fine in tests
+    "F841",    # unused variables are fine in tests
+    "B018",    # useless expressions are fine in tests
+    "E402",    # imports after pytest.importorskip are fine
+]
+
+# Scripts and notebooks - allow print statements
+"scripts/*" = ["S101", "PLR2004"]
+"docs/tutorials/**/*.py" = ["S101", "PLR2004", "F401", "F841"]
+
+# Init files - allow unused imports and import issues
+"*/__init__.py" = ["F401", "F403", "E402", "I002"]
+
+# External/third-party code - ignore most rules
+"src/study/external/**" = ["ALL"]
+
+# Temporary files and backups
+"**/backup/**" = ["ALL"]
+"**/archive/**" = ["ALL"]
+"**/scratch/**" = ["ALL"]
+"nbfnet-update/**" = ["ALL"]
+"**/*_backup.py" = ["ALL"]
+"**/*_old.py" = ["ALL"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

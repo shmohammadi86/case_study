@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build outputs
+dist/
+build/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Cursor-specific
+.cursorignore
+.cursorrules
+!.cursor/*.json
+
+# Large files and binaries
+*.log
+*.sqlite
+*.db
+*.pkl
+*.h5
+*.parquet
+*.csv
+*.json
+.coverage
+.coverage.*
+.coverage.*.*
+!package.json
+!tsconfig.json
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Other caches and locks
+.pixi/
+.nox/
+*.lock
+locks/
+uv.lock
+pixi.lock

@@ -1,0 +1,37 @@
+# Byte-compiled Python files
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+.env/
+
+# Build artifacts
+build/
+dist/
+
+# Test-related files
+.coverage
+test-reports/
+tests/
+
+# Temporary and cache files
+.cache/
+
+# Dev container configuration
+.devcontainer/
+
+# Miscellaneous
+.DS_Store
+
+noxfile
+
+*.md
+
+Dockerfile
+.cruft.json
+noxfile.py
+
+.vscode
+
+.pre-commit-config.yaml

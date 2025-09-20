@@ -1,0 +1,111 @@
+# Local development environment
+.venv/
+.env
+.env.*
+!.env.example
+
+# Scratch directory for temporary files
+/scratch/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Package and build artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+*.so
+*.pyd
+
+# Tool caches (redirected to cache/)
+.nox/
+.cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+
+# Test and temp files (use scratch/agent/ instead)
+test_env/
+*.tmp
+*.temp
+test-reports/
+
+# IDE and editor files
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+
+# Jupyter and notebooks
+docs/design/old
+notebooks/old
+.ipynb_checkpoints/
+
+# Logs and debug
+*.log
+logs/
+lightning_logs/
+
+# Local development files
+local_*
+
+# Data and model files
+*.h5ad
+*.h5mu
+*.h5
+*.pkl
+*.parquet
+*.pt
+*.ckpt
+*.csv
+*.db
+*.sqlite
+
+# Project specific
+scratch/
+cache/
+temp/
+build/
+version.env
+
+# Temporary data and cache directories
+output/
+__marimo__/
+
+# Experiment data (should not be tracked)
+experiments/shared/data/
+experiments/backup/
+
+# External repos
+repos/
+
+# Ignore all files in these directories (they should be in scratch/)
+.marimo/
+.pixi/
+wandb/
+
+# Documentation build artifacts
+docs/_build/
+
+# Archived experiments: ignore NFS temp files
+**/.nfs*
+
+# Prevent re-adding large generated image
+/study_dependency_graph_improved.png
+
+# Allow tutorial templates to be tracked
+!scratch/docs/templates/**

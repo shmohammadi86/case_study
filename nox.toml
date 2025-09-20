@@ -1,0 +1,32 @@
+# ===================================================================
+# NOX CONFIGURATION
+# ===================================================================
+# Separate nox configuration file for better organization
+# This file controls nox behavior for CI/CD and local development
+
+[nox]
+# Environment directory for nox sessions
+envdir = ".nox"
+
+# Reuse existing virtual environments for faster builds
+reuse_existing_virtualenvs = true
+
+# Allow Python downloads in CI environments
+# This fixes the "Python interpreter 3.12 not found" error in GitLab CI
+python_downloads = "manual"
+
+# Default Python versions to use
+# This can be overridden by individual session configurations
+python = ["3.12"]
+
+# Session configuration
+[nox.sessions]
+# Default sessions to run when no specific session is specified
+default = ["lint", "test", "format"]
+
+# Error handling
+error_on_missing_interpreters = false  # Don't fail if Python version is missing locally
+error_on_external_run = false          # Allow external commands in sessions
+
+# Logging configuration
+verbose = false  # Set to true for more detailed output during debugging

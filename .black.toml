@@ -1,0 +1,15 @@
+line-length = 119
+target-version = ["py312"]
+include = "/src/.*\\.pyi?$|/tests/.*\\.pyi?$|/docs/.*\\.pyi?$"
+
+[tool.black]
+exclude = '''
+(
+  \.git
+  | \.mypy_cache
+  | \.venv
+  | build
+  | dist
+  | src/study/external
+)
+'''

@@ -1,0 +1,618 @@
+# ===================================================================
+# UNIFIED CACHE CONFIGURATION - Environment Variable Based
+# ===================================================================
+[tool.project.cache]
+# Primary cache directories with fallback hierarchy
+global_dir = "${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}"
+project_dir = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}"
+
+# Tool-specific cache paths (derived from above)
+uv_cache = "${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/uv"
+nox_cache = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}/nox"
+mypy_cache = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}/mypy"
+pytest_cache = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}/pytest"
+ruff_cache = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}/ruff"
+pre_commit_cache = "${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/pre-commit"
+coverage_cache = "${PROJECT_CACHE_DIR:-${GLOBAL_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}}/study}/coverage"
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=75.0.0",    # Latest stable
+  "wheel>=0.44.0",         # Latest wheel format
+]
+
+[project]
+name = "study"
+description = "Image Fragment Reconstruction via Machine Learning"
+authors = [{ email = "shahin.mohamadi@gmail.com", name = "Shahin Mohammadi" }]
+maintainers = [{ email = "shahin.mohamadi@gmail.com", name = "Shahin Mohammadi" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.13"
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+keywords = [
+  "AI",
+  "Machine Learning",
+  "study",
+  "Image Fragment Reconstruction",
+]
+dynamic = ["version"]
+
+# ===================================================================
+# CORE RUNTIME DEPENDENCIES - Production essentials
+# ===================================================================
+dependencies = [
+  # Scientific computing core
+  "numpy>=2.0.0,<2.2", # Latest stable for best H100/A100 performance
+  "scipy>=1.14,<1.16", # Modern optimized routines
+  "numexpr>=2.10,<2.12", # Fast numerical expressions
+  "numba>=0.60.0,<0.62", # JIT compilation for GPU kernels
+  # Data manipulation and analysis
+  "pandas>=2.2.0,<2.3", # Latest stable
+  "xarray>=2025.06.1,<2026.0", # Modern array operations
+  "anndata[dask]>=0.12.2,<0.13", # Single-cell data handling
+  "dask>=2024.12.0,<2024.13.0", # Compatible with RAPIDS 25.2.x
+  # Machine learning essentials
+  "scikit-learn>=1.5,<1.8", # Latest stable ML algorithms
+  "scikit-misc>=0.5,<0.6", # Additional ML utilities
+  "scikit-image>=0.22,<0.26", # Image processing
+  "xgboost>=2.1,<2.2", # Gradient boosting (GPU accelerated)
+  # Visualization core
+  "matplotlib>=3.8,<3.11", # Plotting
+  "seaborn>=0.13,<0.14", # Statistical visualization
+  # Configuration and validation
+  "pydantic>=2.8,<3.0", # Data validation
+  "omegaconf>=2.3,<2.4", # Configuration management
+  "hydra-core>=1.3,<1.4", # Configuration framework
+  "toml>=0.10,<1.0", # TOML parsing
+  # CLI and user interface
+  "click>=8.1,<9.0", # Command line interface
+  "rich>=13.7,<14.0", # Rich text formatting
+  "jsonargparse[signatures]>=4.37.0,<5.0", # Advanced CLI
+  # Cloud and distributed computing
+  "ray[default]>=2.45,<2.50", # Distributed computing (GPU aware)
+  "gcsfs>=2024.1,<2025.0", # Google Cloud Storage
+  "cloudpathlib[gs]>=0.20,<1.0", # Cloud path handling
+  # Data storage and persistence
+  "tiledbsoma>=1.17,<2.0", # High-performance storage
+  "tiledb>=0.34,<1.0", # Array database
+  "sqlitedict>=2.1.0,<3.0", # Persistent dictionaries
+  # Interactive computing
+  "traitlets>=5.14,<6.0", # Configuration system
+  "session-info>=1.0,<2.0", # Environment information
+  # System utilities
+  "requests>=2.32,<3.0", # HTTP requests
+  "typing-extensions>=4.12,<5.0", # Advanced typing
+  "loguru>=0.7,<1.0", # Modern logging
+  "packaging>=24.0,<25.0", # Package utilities
+  "markdown>=3.8.2",
+  "pygments>=2.19.2",
+  "marimo>=0.14, <0.15",
+  "pymdown-extensions>=10.16",
+  "linkify-it-py>=2.0.3",
+  "easydict>=1.13",
+  "ogb>=1.3.0,<2.0",
+  "wandb>=0.21.0",
+  "argcomplete>=3.6.2",
+  "lxml>=6.0,<7.0",
+  "leidenalg>=0.10.2",
+  "gdown",
+]
+
+
+# ===================================================================
+# HARDWARE DEPENDENCIES
+# ===================================================================
+[project.optional-dependencies]
+
+# Direct hardware builds (mutually exclusive)
+cpu = [
+  "torch==2.6.0",
+  "torchvision==0.16.0",
+  "torchaudio==2.6.0",
+  "torch_geometric>=2.6.0,<2.8",
+  "pyg_lib @ https://data.pyg.org/whl/torch-2.6.0%2Bcpu/pyg_lib-0.4.0%2Bpt26cpu-cp312-cp312-linux_x86_64.whl",
+  "torch_cluster @ https://data.pyg.org/whl/torch-2.6.0%2Bcpu/torch_cluster-1.6.3%2Bpt26cpu-cp312-cp312-linux_x86_64.whl",
+  "torch_scatter @ https://data.pyg.org/whl/torch-2.6.0%2Bcpu/torch_scatter-2.1.2%2Bpt26cpu-cp312-cp312-linux_x86_64.whl",
+  "torch_sparse @ https://data.pyg.org/whl/torch-2.6.0%2Bcpu/torch_sparse-0.6.18%2Bpt26cpu-cp312-cp312-linux_x86_64.whl",
+  "torch_spline_conv @ https://data.pyg.org/whl/torch-2.6.0%2Bcpu/torch_spline_conv-1.2.2%2Bpt26cpu-cp312-cp312-linux_x86_64.whl",
+  "lightning>=2.4.0,<2.5",
+  "torchmetrics>=1.5.0,<1.6",
+  "jax>=0.4.34,<0.5",
+]
+
+# Conservative CUDA 12.4 (maximum compatibility)
+cu124 = [
+  "torch==2.6.0+cu124; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision==0.21.0+cu124; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio==2.6.0+cu124; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch_geometric>=2.6.0,<2.8; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "pyg_lib @ https://data.pyg.org/whl/torch-2.6.0+cu124/pyg_lib-0.4.0+pt26cu124-cp312-cp312-linux_x86_64.whl",
+  "torch_cluster @ https://data.pyg.org/whl/torch-2.6.0+cu124/torch_cluster-1.6.3+pt26cu124-cp312-cp312-linux_x86_64.whl",
+  "torch_scatter @ https://data.pyg.org/whl/torch-2.6.0+cu124/torch_scatter-2.1.2+pt26cu124-cp312-cp312-linux_x86_64.whl",
+  "torch_sparse @ https://data.pyg.org/whl/torch-2.6.0+cu124/torch_sparse-0.6.18+pt26cu124-cp312-cp312-linux_x86_64.whl",
+  "torch_spline_conv @ https://data.pyg.org/whl/torch-2.6.0+cu124/torch_spline_conv-1.2.2+pt26cu124-cp312-cp312-linux_x86_64.whl",
+  "lightning>=2.4.0,<2.5",
+  "torchmetrics>=1.5.0,<1.6",
+  "jax>=0.4.34,<0.5",
+  "jax-cuda12-plugin>=0.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cupy-cuda12x>=13.3.0,<14.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nvidia-ml-py>=12.560.30; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cuml-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nx-cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "dask-cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rapids-singlecell>0.13,<1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+# Stable CUDA 12.6 (recommended for production)
+cu126 = [
+  "torch==2.6.0+cu126; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision==0.21.0+cu126; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio==2.6.0+cu126; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch_geometric>=2.6.0,<2.8; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "pyg_lib @ https://data.pyg.org/whl/torch-2.6.0+cu126/pyg_lib-0.4.0+pt26cu126-cp312-cp312-linux_x86_64.whl",
+  "torch_cluster @ https://data.pyg.org/whl/torch-2.6.0+cu126/torch_cluster-1.6.3+pt26cu126-cp312-cp312-linux_x86_64.whl",
+  "torch_scatter @ https://data.pyg.org/whl/torch-2.6.0+cu126/torch_scatter-2.1.2+pt26cu126-cp312-cp312-linux_x86_64.whl",
+  "torch_sparse @ https://data.pyg.org/whl/torch-2.6.0+cu126/torch_sparse-0.6.18+pt26cu126-cp312-cp312-linux_x86_64.whl",
+  "torch_spline_conv @ https://data.pyg.org/whl/torch-2.6.0+cu126/torch_spline_conv-1.2.2+pt26cu126-cp312-cp312-linux_x86_64.whl",
+  "lightning>=2.4.0,<2.5",
+  "torchmetrics>=1.5.0,<1.6",
+  "jax>=0.4.34,<0.5",
+  "jax-cuda12-plugin>=0.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cupy-cuda12x>=13.3.0,<14.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nvidia-ml-py>=12.560.30; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cuml-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nx-cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "dask-cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rapids-singlecell>0.13,<1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+# Cutting-edge CUDA 12.8 (maximum H100/A100 performance)
+cu128 = [
+  "torch==2.8.0+cu128; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision==0.23.0+cu128; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio==2.8.0+cu128; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch_geometric>=2.6,<2.8; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "pyg_lib @ https://data.pyg.org/whl/torch-2.8.0+cu128/pyg_lib-0.4.0+pt28cu128-cp312-cp312-linux_x86_64.whl",
+  "torch_cluster @ https://data.pyg.org/whl/torch-2.8.0+cu128/torch_cluster-1.6.3+pt28cu128-cp312-cp312-linux_x86_64.whl",
+  "torch_scatter @ https://data.pyg.org/whl/torch-2.8.0+cu128/torch_scatter-2.1.2+pt28cu128-cp312-cp312-linux_x86_64.whl",
+  "torch_sparse @ https://data.pyg.org/whl/torch-2.8.0+cu128/torch_sparse-0.6.18+pt28cu128-cp312-cp312-linux_x86_64.whl",
+  "torch_spline_conv @ https://data.pyg.org/whl/torch-2.8.0+cu128/torch_spline_conv-1.2.2+pt28cu128-cp312-cp312-linux_x86_64.whl",
+  "lightning>=2.4.0,<2.5",
+  "torchmetrics>=1.5.0,<1.6",
+  "jax>=0.4.34,<0.5",
+  "jax-cuda12-plugin>=0.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cupy-cuda12x>=13.3.0,<14.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nvidia-ml-py>=12.560.30; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cuml-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "nx-cugraph-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "dask-cudf-cu12>=25.0,<26.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rapids-singlecell>0.13,<1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+
+# ===================================================================
+# DEVELOPMENT AND TOOLING DEPENDENCIES
+# ===================================================================
+
+# Testing framework and coverage
+test = [
+  "pytest>=8.3",           # Latest testing framework
+  "pytest-cov>=5.0",       # Coverage reporting
+  "pytest-xdist>=3.6",     # Parallel test execution
+  "pytest-timeout>=2.3",   # Test timeouts
+  "pytest-mock>=3.14",     # Mocking utilities
+  "coverage[toml]>=7.6.1", # Coverage measurement
+  "mock>=5.1",             # Mock objects
+  "coverage-badge>=1.1",   # Coverage badges
+  "pytest-github-actions-annotate-failures>=0.2.0", # GitHub Actions annotations
+  # GPU testing utilities
+  "pytest-benchmark>=4.0.0", # Performance benchmarking
+]
+
+# Code quality and formatting
+lint = [
+  "ruff>=0.8.0",    # Fast linter and formatter
+  "black>=24.10.0", # Code formatting
+  "isort>=5.13.0",  # Import sorting
+]
+
+# Type checkers and analysis (consolidated)
+typing = [
+  "pyright>=1.1.390",          # Microsoft's static type checker
+  "typos>=1.26.0",             # Spell checker for code
+  "mypy>=1.13",                # Static type checker
+  "types-pytz>=2024.2",        # Type stubs for pytz
+  "types-PyYAML>=6.0",         # YAML type stubs
+  "types-setuptools>=75.0",    # Setuptools stubs
+  "types-python-dateutil>=2.9",# Dateutil stubs
+  "types-mock>=5.1",           # Mock stubs
+  "types-requests>=2",         # Requests stubs
+  "pandas-stubs>=2.2.1",       # Pandas stubs
+]
+
+# Package building and deployment
+build = [
+  "build>=1.2.0",          # PEP 517 build
+  "twine>=5.1.0",          # Secure publishing
+  "wheel>=0.44.0",         # Wheel format
+  "setuptools>=75.0.0",    # Build system
+  "setuptools-scm>=8.1.0", # Git versioning
+  "tomli-w>=1.1.0",        # TOML writing
+]
+
+# Development environment (comprehensive)
+dev = [
+  "study[test]",
+  "study[lint]",
+  "study[typing]",
+  "study[build]",
+  "pre-commit>=4.0.0",  # Git hooks
+  "commitizen>=3.29.0", # Conventional commits
+  "nox[uv]>=2024.10.9", # Test automation
+  "uv>=0.5.0",          # Package management
+  # GPU development tools
+  "gpustat>=1.1.1",          # GPU monitoring
+  "nvidia-ml-py>=12.560.30", # NVIDIA management
+]
+
+# ===================================================================
+# DOMAIN-SPECIFIC SCIENTIFIC PACKAGES
+# ===================================================================
+
+# Jupyter and interactive environments
+notebook = [
+  "marimo[recommended]>=0.14.13,<1.0", # Modern reactive notebooks
+  "ipython>=8.26,<9.0",               # Enhanced shell
+  "ipykernel>=6.29,<7.0",             # Jupyter kernel
+  "ipywidgets>=8.1,<9.0",             # Interactive widgets
+  "jupyterlab>=4.2,<5.0",             # Modern interface
+  "jupytext>=1.16,<2.0",              # Format conversion
+  "myst-nb>=1.1,<2.0",                # MyST integration
+  "markdown",
+]
+
+# Advanced visualization
+plotting = [
+  "plotly>=5.24,<6.0",                 # Interactive plotting
+  "holoviews[recommended]>=1.19,<2.0", # Declarative viz
+  "datashader>=0.16,<1.0",             # Big data visualization
+  "bokeh>=3.5,<4.0",                   # Interactive viz
+  "hvplot>=0.11,<1.0",                 # High-level plotting
+  "PyComplexHeatmap>=1.8,<=2.0",
+  "plotnine>=0.13,<1.0",               # Grammar of graphics  
+]
+
+# Machine learning ecosystem (GPU-optimized)
+ml = [
+  # Transformer and language models
+  "transformers==4.38.0",  # Hugging Face
+  "huggingface_hub>=0.26,<1.0", # Model hub
+  "datasets>=2.14.6,<4.0",         # Dataset loading
+
+  # Experiment tracking
+  "wandb>=0.18,<1.0",       # Weights & Biases
+  "tensorboard>=2.15,<3.0", # TensorBoard visualization
+  "mlflow>=2.10,<3.0",      # MLflow experiment tracking
+
+  # Hyperparameter optimization
+  "optuna>=3.5,<4.0",       # Optuna optimization
+
+  # TileDB ML ecosystem
+  "tiledb-ml>=0.9.7,<1.0",     # TileDB ML
+  "tiledbsoma-ml>=0.1.0,<1.0", # SOMA ML
+
+  # Distributed computing (GPU-aware)
+  "ray[data,train,tune,serve]>=2.45,<2.50", # Ray with GPU support
+
+  # Specialized algorithms
+  "pot>=0.9,<1.0",      # Optimal transport
+  "pygsp>=0.5,<1.0",    # Graph signal processing
+  "shapely>=2.0,<3.0",  # Geometric operations
+  "zuko>=0.2,<1.0",     # Normalizing flows
+  "torchdyn>=1.0,<2.0", # Neural ODEs
+
+  # Graph benchmarks
+  "ogb>=1.0,<2.0",    # Open Graph Benchmark
+
+  # Model optimization
+  "peft<=0.13.2", # Parameter-efficient fine-tuning
+
+  # Tensor operations
+  "einops>=0.8.0,<1.0",         # Readable tensor ops
+  "ml-collections>=1.0.0,<2.0", # ML configurations
+
+  # Advanced architectures
+  "enformer-pytorch>=0.8,<1.0", # Enformer models
+  "local_attention>=1.0,<2.0",  # Local attention
+
+  # Optimization libraries
+  "geoopt>=0.5,<1.0",    # Riemannian optimization
+  "pyriemann>=0.8,<1.0", # Riemannian geometry
+
+  "lmdb>=1.2.1,<2.0"
+]
+
+# Computational biology and single-cell analysis
+bio = [
+  # Core single-cell analysis frameworks
+  "mudata>=0.3",                          # Multimodal data handling
+  "scanpy>=1.11",                         # Single-cell analysis in Python
+  "scvi-tools>=1.3",                      # Deep generative models for single-cell
+  "scib-metrics>=0.5.6",                  # Single-cell integration benchmarking
+
+
+  # Large-scale biological data access
+  "cellxgene-census[experimental]>=1.16.0", # CELLxGENE Census data access
+
+  # Genomics and sequence analysis
+  "genomepy>=0.16",                       # Genome and annotation downloads
+  "biopython>=1.84",                      # Biological computation tools
+
+  # Pathway and gene set analysis
+  "gseapy>=1.1",                          # Gene Set Enrichment Analysis
+  "goatools>=1.4",                        # Gene Ontology analysis
+  "pertpy[de]>=1.0.0",                    # Perturbation analysis tools
+  "pdex>=0.1.21,<2.0",                     # Parallel differential expression for single-cell perturbation sequencing
+  "adpbulk>=0.1.4,<2.0",                  # Single-cell pseudo-bulk computation
+  "cell-eval>=0.5.0,<2.0",                # Single-cell perturbation evaluation
+
+  # Advanced single-cell methods
+  "moscot>=0.4.0",                        # Optimal transport for single-cell
+  "pydeseq2>=0.5.1",                      # Differential expression analysis
+  "cellflow-tools>=0.0.6",                # Cell flow analysis
+  "scimilarity>=0.4.1",                   # Cell similarity and matching
+
+  # Drug discovery and chemical informatics
+  "cmappy>=1.2",                          # Connectivity Map analysis
+  "pubchempy>=1.0",                       # PubChem compound database access
+
+  # Graph analysis for biology (note: igraph version differs from graph extra)
+  "igraph>=0.11",                         # Graph analysis library
+
+  # Data storage and nearest neighbor search
+  "zarr >=2.18.7, !=3.0.*",                         # Chunked, compressed N-D arrays
+  "pynndescent>=0.5.10",                  # Nearest neighbor descent algorithm
+  "umap-learn>=0.5.7",                    # Uniform Manifold Approximation
+]
+
+
+# Graph analysis and network science
+graph = [
+  "igraph>=0.11,<1.0",  # Graph analysis
+  "networkx>=3.0,<4.0", # Network analysis
+  "ndex2>=3.11,<4.0",   # Network data exchange
+  "obonet>=1.1,<2.0",   # OBO ontologies
+  "metis>=0.2a5,<1.0",  # Graph partitioning
+  "torch-graph-force>=0.1,<1.0", # torch graph force-directed layout
+  "pyvis >= 0.3,<1.0", # pyvis visualization
+  # "torch-geometric-signed-directed>=1.0,<2.0"  # torch geometric extension for signed directed graphs
+]
+
+# Documentation generation
+docs = [
+  # Core Sphinx
+  "sphinx>=8.0,<9.0",                   # Documentation generator
+  "sphinx-book-theme>=1.1,<2.0",        # Modern theme
+  "sphinx-sitemap>=2.6,<3.0",           # Sitemap
+  "sphinx-copybutton>=0.5.2,<1.0",      # Copy buttons
+  "sphinx-autodoc-typehints>=2.5,<3.0", # Type hints
+  "sphinx-tabs>=3.4,<4.0",              # Tabs
+  "sphinx-rtd-theme>=3.0.2",            # Read the Docs theme
+
+  # Extensions
+  "sphinx_inline_tabs>=2023.4.21,<2025.0", # Inline tabs
+  "sphinx_design>=0.6,<1.0",               # Design elements
+  "sphinx-toolbox>=3.8,<4.0",              # Additional tools
+  "sphinx_togglebutton>=0.3.2,<1.0",       # Toggle buttons
+  "sphinxcontrib-bibtex>=2.6.5,<3.0",      # Bibliography
+  "sphinxext-opengraph>=0.10.0,<1.0",      # Open Graph
+  "autodoc-pydantic>=2.2,<3.0",            # Pydantic docs
+
+  # Alternative systems
+  "mkdocs-material>=9.5,<10.0",            # Material theme
+  "mkdocstrings-python>=1.12,<2.0",        # Python docstrings
+  "griffe-inherited-docstrings>=1.1,<2.0", # Inherited docs
+
+  # Notebook integration
+  "jupytext>=1.16,<2.0",  # Format conversion
+  "myst-nb>=1.1,<2.0",    # MyST notebooks
+  "ipywidgets>=8.1,<9.0", # Interactive widgets
+
+  # Marimo interactive notebooks
+  "marimo>=0.10.0,<1.0",     # Interactive notebooks
+  "markdown>=3.6,<4.0",      # Markdown support
+  "pymdown-extensions>=10.0,<11.0", # Enhanced markdown
+]
+
+
+# Environment combinations optimized for H100/A100 workflows
+default = [
+  "study[ml]",
+  "study[bio]",
+  "study[plotting]",
+  "study[graph]",
+  "study[notebook]",
+  "study[lint]",
+]
+
+
+# ===================================================================
+# SETUPTOOLS CONFIGURATION
+# ===================================================================
+[tool.setuptools]
+include-package-data = true
+packages = ["study"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools-scm]
+fallback_version = "0.1.0"
+write_to = "src/study/_version.py"
+
+# ===================================================================
+# UV CONFIGURATION - H100/A100 Cluster Optimized (FIXED)
+# ===================================================================
+[tool.uv]
+# Hardware-specific conflicts (FIXED - only direct CUDA extras)
+conflicts = [
+  [
+    { extra = "cpu" },
+    { extra = "cu124" },
+    { extra = "cu126" },
+    { extra = "cu128" },
+  ],
+]
+
+# Target high-performance environments
+environments = [
+  "sys_platform == 'linux' and platform_machine == 'x86_64'", # Primary H100/A100 target
+]
+
+# ===================================================================
+# CACHE CONFIGURATION - High-Performance GPU Optimized
+# ===================================================================
+
+# Flexible cache directory
+cache-dir = "${uv_cache:-${HOME}/.cache/uv}" # Override with UV_CACHE_DIR
+
+# Optimal performance settings
+# link-mode = "copy"
+link-mode = "hardlink" # Fastest on Linux
+
+# H100/A100 optimized cache invalidation
+cache-keys = [
+  # Project files
+  { file = "pyproject.toml" },
+  { file = "uv.lock" },
+
+  # Version control
+  { git = { commit = true, tags = true } },
+
+  # CUDA environment for H100/A100
+  { env = "CUDA_VERSION" },
+  { env = "CUDNN_VERSION" },
+  { env = "CUDA_HOME" },
+  { env = "NVIDIA_DRIVER_VERSION" },
+
+  # PyTorch ecosystem
+  { env = "PYTORCH_VERSION" },
+  { env = "TORCHVISION_VERSION" },
+  { env = "TORCH_CUDA_ARCH_LIST" },
+
+  # H100/A100 specific optimizations
+  { env = "TORCH_COMPILE_MODE" },         # PyTorch 2.0+ compilation
+  { env = "TORCH_CUDNN_V8_API_ENABLED" }, # cuDNN v8 optimizations
+  { env = "NCCL_ALGO" },                  # Multi-GPU communications
+  { env = "NCCL_P2P_DISABLE" },           # P2P optimizations
+
+  # Build optimization
+  { env = "MAX_JOBS" },
+  { env = "CMAKE_BUILD_TYPE" },
+  { env = "MAKEFLAGS" },
+
+  # Platform builds
+  { env = "MACOSX_DEPLOYMENT_TARGET" },
+]
+
+# ===================================================================
+# INDEX CONFIGURATION - Modern PyTorch 2.6 with CUDA 12.4+
+# ===================================================================
+
+# CPU-only PyTorch builds
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# CUDA 12.4 PyTorch builds (stable for H100/A100)
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+# CUDA 12.6 PyTorch builds (latest for H100/A100)
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+# CUDA 12.8 PyTorch builds (CUTTING-EDGE for H100/A100 + Blackwell)
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# RAPIDS
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+explicit = true
+
+
+# ===================================================================
+# SOURCE MAPPING - Mutually exclusive markers
+# ===================================================================
+[tool.uv.sources]
+"torch" = [
+  { index = "pytorch-cu124", marker = "extra == 'cu124' and extra != 'cu126' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu126", marker = "extra == 'cu126' and extra != 'cu124' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu128", marker = "extra == 'cu128' and extra != 'cu124' and extra != 'cu126' and extra != 'cpu'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu' and extra != 'cu124' and extra != 'cu126' and extra != 'cu128'" }
+]
+
+"torchvision" = [
+  { index = "pytorch-cu124", marker = "extra == 'cu124' and extra != 'cu126' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu126", marker = "extra == 'cu126' and extra != 'cu124' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu128", marker = "extra == 'cu128' and extra != 'cu124' and extra != 'cu126' and extra != 'cpu'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu' and extra != 'cu124' and extra != 'cu126' and extra != 'cu128'" }
+]
+
+"torchaudio" = [
+  { index = "pytorch-cu124", marker = "extra == 'cu124' and extra != 'cu126' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu126", marker = "extra == 'cu126' and extra != 'cu124' and extra != 'cu128' and extra != 'cpu'" },
+  { index = "pytorch-cu128", marker = "extra == 'cu128' and extra != 'cu124' and extra != 'cu126' and extra != 'cpu'" },
+  { index = "pytorch-cpu", marker = "extra == 'cpu' and extra != 'cu124' and extra != 'cu126' and extra != 'cu128'" }
+]
+
+"cudf-cu12" = [
+  { index = "nvidia", marker = "extra == 'cu124' or extra == 'cu126' or extra == 'cu128'"}
+]
+
+"cuml-cu12" = [
+  { index = "nvidia", marker = "extra == 'cu124' or extra == 'cu126' or extra == 'cu128'"}
+]
+
+"cugraph-cu12" = [
+  { index = "nvidia", marker = "extra == 'cu124' or extra == 'cu126' or extra == 'cu128'"}
+]
+
+"nx-cugraph-cu12" = [
+  { index = "nvidia", marker = "extra == 'cu124' or extra == 'cu126' or extra == 'cu128'"}
+]
+pyg-lib = { url = "https://data.pyg.org/whl/torch-2.8.0+cu128/pyg_lib-0.4.0+pt28cu128-cp312-cp312-linux_x86_64.whl" }
+torch-scatter = { url = "https://data.pyg.org/whl/torch-2.8.0+cu128/torch_scatter-2.1.2+pt28cu128-cp312-cp312-linux_x86_64.whl" }
+torch-sparse = { url = "https://data.pyg.org/whl/torch-2.8.0+cu128/torch_sparse-0.6.18+pt28cu128-cp312-cp312-linux_x86_64.whl" }
+torch-cluster = { url = "https://data.pyg.org/whl/torch-2.8.0+cu128/torch_cluster-1.6.3+pt28cu128-cp312-cp312-linux_x86_64.whl" }
+torch-spline-conv = { url = "https://data.pyg.org/whl/torch-2.8.0+cu128/torch_spline_conv-1.2.2+pt28cu128-cp312-cp312-linux_x86_64.whl" }

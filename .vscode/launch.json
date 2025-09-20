@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug Tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "-s"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
