@@ -88,7 +88,7 @@ You can run evaluation on CPU either via the notebook or a minimal Python script
 
 1) Notebook (recommended for exploration)
 
-- Open `notebooks/fragment_reconstruction_pipeline.ipynb` in Jupyter or VS Code.
+- Open `experiments/notebooks/fragment_reconstruction_pipeline.ipynb` in Jupyter or VS Code.
 - Ensure you have the environment installed (see `requirements.txt` and `pyproject.toml`).
 - The notebook demonstrates loading data, training (optional), and CPU-friendly evaluation and visualization.
 
@@ -134,7 +134,8 @@ Notes:
 
 - The trainer logs clustering metrics (ARI/NMI with KMeans and KMedoids) during validation. See `FragmentAutoencoderTrainer.validation_step()` in `src/study/trainer.py`.
 - Checkpoints are saved under `outputs/<model_name>/checkpoints/` by the Lightning `ModelCheckpoint` callback configured in `FragmentAutoencoderTrainer.configure_callbacks()`.
-- To reproduce a quick run end-to-end on CPU, you can also execute the `__main__` block in `src/study/trainer.py` (it defaults to the convolutional autoencoder).
+- To reproduce a quick run end-to-end on CPU, you can also run the training script:
+  - `python experiments/scripts/train.py --data-path data/train_data --output-dir outputs/conv_autoencoder`
 
 ## Notes
 
