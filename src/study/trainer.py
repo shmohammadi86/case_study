@@ -1,226 +1,347 @@
-"""
-Training Pipeline for ImageNet-64 Classification using PyTorch Lightning
-"""
+"""Fragment Autoencoder Trainer with clustering metrics."""
+
+from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
-import torchmetrics
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+from sklearn_extra.cluster import KMedoids
 from torch.utils.data import DataLoader
+from torchmetrics import Accuracy, MeanMetric
 
-from .data import ImageNet64Dataset, get_augmentation_transforms
-from .models import count_parameters, create_cnn_model, create_transfer_learning_model
+from .datasets import FragmentBatchDataset
+from .models import (
+    count_parameters,
+    create_autoencoder,
+    create_linear_autoencoder,
+    create_pca_autoencoder,
+    create_supervised_classifier,
+)
+
+
+class ModelProtocol(Protocol):
+    """Protocol for models that return (output, embeddings) tuple."""
+
+    def __call__(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]: ...
+    def state_dict(self) -> dict[str, Any]: ...
+    def parameters(self) -> Iterator[torch.nn.Parameter]: ...
+    def named_parameters(self) -> Iterator[tuple[str, torch.nn.Parameter]]: ...
+
 
 logger = logging.getLogger(__name__)
 
 
-class ImageNet64LightningModule(pl.LightningModule):
-    """
-    PyTorch Lightning module for ImageNet-64 classification.
-    """
-
-    def __init__(self, model_config: dict[str, Any], training_config: dict[str, Any]):
+class FragmentAutoencoderTrainer(pl.LightningModule):
+    def __init__(
+        self,
+        data_path: str,
+        model_type: str = "conv",
+        images_per_batch: int = 10,
+        batch_size: int = 8,
+        epochs: int = 100,
+        learning_rate: float = 1e-3,
+        weight_decay: float = 1e-4,
+        encoder_channels: list[int] | None = None,
+        latent_dim: int = 128,
+        early_stopping_patience: int = 15,
+        num_workers: int = 4,
+        steps_per_epoch: int = 1000,
+        output_dir: str = "outputs",
+        num_classes: int = 1000,
+    ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model_config = model_config
-        self.training_config = training_config
+        # Model hyperparameters
+        self.model_type = model_type
+        self.encoder_channels = encoder_channels or [32, 64]
+        self.latent_dim = latent_dim
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.num_classes = num_classes
 
-        # Create model
-        if self.model_config.get("use_transfer_learning", False):
-            self.model = create_transfer_learning_model(
-                base_model_name=self.model_config.get("base_model", "resnet50"),
-                num_classes=self.model_config.get("num_classes", 1000),
-                trainable_layers=self.model_config.get("trainable_layers", 0),
+        # Training hyperparameters
+        self.images_per_batch = images_per_batch
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.early_stopping_patience = early_stopping_patience
+        self.num_workers = num_workers
+        self.steps_per_epoch = steps_per_epoch
+
+        # Paths
+        self.data_path = Path(data_path)
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create model based on type
+        self.model: ModelProtocol
+        if model_type == "conv":
+            self.model = create_autoencoder(
+                input_channels=3, latent_dim=latent_dim, encoder_channels=encoder_channels, input_size=16
+            )
+        elif model_type == "linear":
+            self.model = create_linear_autoencoder(input_channels=3, latent_dim=latent_dim, input_size=16)
+        elif model_type == "pca":
+            self.model = create_pca_autoencoder(input_channels=3, latent_dim=latent_dim, input_size=16)
+        elif model_type == "supervised":
+            self.model = create_supervised_classifier(
+                input_channels=3, latent_dim=latent_dim, num_classes=num_classes, input_size=16
             )
         else:
-            self.model = create_cnn_model(
-                num_classes=self.model_config.get("num_classes", 1000),
-                architecture=self.model_config.get("architecture", "simple"),
-            )
+            raise ValueError(f"Unknown model type: {model_type}")
 
-        # Metrics
-        self.train_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000)
-        self.val_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000)
-        self.test_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000)
-
-        self.train_top5_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000, top_k=5)
-        self.val_top5_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000, top_k=5)
-        self.test_top5_accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=1000, top_k=5)
-
-        logger.info(f"Created model with {count_parameters(self.model):,} parameters")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-    def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-
-        # Calculate metrics
-        self.train_accuracy(logits, y)
-        self.train_top5_accuracy(logits, y)
-
-        # Log metrics
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train_acc", self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train_top5_acc", self.train_top5_accuracy, on_step=False, on_epoch=True)
-
-        return loss
-
-    def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-
-        # Calculate metrics
-        self.val_accuracy(logits, y)
-        self.val_top5_accuracy(logits, y)
-
-        # Log metrics
-        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val_acc", self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val_top5_acc", self.val_top5_accuracy, on_step=False, on_epoch=True)
-
-        return loss
-
-    def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-
-        # Calculate metrics
-        self.test_accuracy(logits, y)
-        self.test_top5_accuracy(logits, y)
-
-        # Log metrics
-        self.log("test_loss", loss, on_step=False, on_epoch=True)
-        self.log("test_acc", self.test_accuracy, on_step=False, on_epoch=True)
-        self.log("test_top5_acc", self.test_top5_accuracy, on_step=False, on_epoch=True)
-
-        return loss
-
-    def configure_optimizers(self) -> dict[str, Any]:
-        optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.training_config.get("learning_rate", 0.001),
-            weight_decay=self.training_config.get("weight_decay", 1e-4),
+        # Initialize loss function
+        self.criterion: torch.nn.CrossEntropyLoss | torch.nn.MSELoss = (
+            torch.nn.CrossEntropyLoss() if model_type == "supervised" else torch.nn.MSELoss()
         )
 
+        # Initialize accuracy metrics
+        self.train_accuracy: Accuracy | None = None
+        self.val_accuracy: Accuracy | None = None
+
+        # Initialize torchmetrics
+        self._setup_metrics()
+
+    def _setup_metrics(self) -> None:
+        """Initialize torchmetrics for proper distributed training support."""
+        # Initialize accuracy metrics if they haven't been set yet
+        if self.model_type == "supervised" and self.train_accuracy is None:
+            self.train_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes)
+            self.val_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes)
+
+        # Clustering metrics (using MeanMetric for proper aggregation)
+        self.train_kmeans_ari = MeanMetric()
+        self.train_kmeans_nmi = MeanMetric()
+        self.train_kmedoids_ari = MeanMetric()
+        self.train_kmedoids_nmi = MeanMetric()
+        self.train_mean_ari = MeanMetric()
+        self.train_mean_nmi = MeanMetric()
+        self.train_mean_clustering_score = MeanMetric()
+
+        self.val_kmeans_ari = MeanMetric()
+        self.val_kmeans_nmi = MeanMetric()
+        self.val_kmedoids_ari = MeanMetric()
+        self.val_kmedoids_nmi = MeanMetric()
+        self.val_mean_ari = MeanMetric()
+        self.val_mean_nmi = MeanMetric()
+        self.val_mean_clustering_score = MeanMetric()
+
+    def setup(self, stage: str | None = None) -> None:
+        if stage == "fit" or stage is None:
+            self.train_dataset = FragmentBatchDataset(
+                images_dir=self.data_path,
+                images_per_sample=self.images_per_batch,
+                steps_per_epoch=self.steps_per_epoch,
+                seed=42,
+                augment=True,
+            )
+
+            self.val_dataset = FragmentBatchDataset(
+                images_dir=self.data_path,
+                images_per_sample=self.images_per_batch,
+                steps_per_epoch=self.steps_per_epoch // 4,
+                seed=123,
+                augment=False,
+            )
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=self.num_workers > 0,
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            persistent_workers=self.num_workers > 0,
+        )
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass through the model.
+
+        Returns:
+            For autoencoders: (reconstructed, embeddings)
+            For supervised: (logits, embeddings)
+        """
+        return self.model(x)
+
+    def _compute_clustering_metrics(self, embeddings: torch.Tensor, source_ids: torch.Tensor) -> dict[str, float]:
+        embeddings_np = embeddings.detach().cpu().numpy()
+        source_ids_np = source_ids.cpu().numpy()
+
+        n_clusters = len(torch.unique(source_ids))
+        if n_clusters < 2:
+            return {
+                "kmeans_ari": 0.0,
+                "kmeans_nmi": 0.0,
+                "kmedoids_ari": 0.0,
+                "kmedoids_nmi": 0.0,
+                "mean_ari": 0.0,
+                "mean_nmi": 0.0,
+                "mean_clustering_score": 0.0,
+            }
+
+        # K-means clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        kmeans_labels = kmeans.fit_predict(embeddings_np)
+        kmeans_ari = adjusted_rand_score(source_ids_np, kmeans_labels)
+        kmeans_nmi = normalized_mutual_info_score(source_ids_np, kmeans_labels)
+
+        # K-medoids clustering
+        kmedoids = KMedoids(n_clusters=n_clusters, random_state=42, init="k-medoids++")
+        kmedoids_labels = kmedoids.fit_predict(embeddings_np)
+        kmedoids_ari = adjusted_rand_score(source_ids_np, kmedoids_labels)
+        kmedoids_nmi = normalized_mutual_info_score(source_ids_np, kmedoids_labels)
+
+        # Compute means
+        mean_ari = (kmeans_ari + kmedoids_ari) / 2
+        mean_nmi = (kmeans_nmi + kmedoids_nmi) / 2
+        mean_clustering_score = (mean_ari + mean_nmi) / 2
+
+        return {
+            "kmeans_ari": float(kmeans_ari),
+            "kmeans_nmi": float(kmeans_nmi),
+            "kmedoids_ari": float(kmedoids_ari),
+            "kmedoids_nmi": float(kmedoids_nmi),
+            "mean_ari": float(mean_ari),
+            "mean_nmi": float(mean_nmi),
+            "mean_clustering_score": float(mean_clustering_score),
+        }
+
+    def training_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
+        fragments: torch.Tensor = batch.fragments
+        source_ids: torch.Tensor = batch.source_ids
+        loss: torch.Tensor
+
+        if self.model_type == "supervised":
+            # Supervised learning: predict source image ID
+            logits, embeddings = self(fragments)
+            loss = self.criterion(logits, source_ids)
+
+            # Update accuracy using torchmetrics
+            if self.train_accuracy is not None:
+                self.train_accuracy(logits, source_ids)
+
+            self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+            if self.train_accuracy is not None:
+                self.log("train_accuracy", self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        else:
+            # Autoencoder: reconstruction loss
+            reconstructed, embeddings = self(fragments)
+            loss = self.criterion(reconstructed, fragments)
+            self.log("train_recon_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+
+        # Clustering metrics for all models
+        clustering_metrics = self._compute_clustering_metrics(embeddings, source_ids)
+
+        # Update torchmetrics
+        self.train_kmeans_ari(clustering_metrics["kmeans_ari"])
+        self.train_kmeans_nmi(clustering_metrics["kmeans_nmi"])
+        self.train_kmedoids_ari(clustering_metrics["kmedoids_ari"])
+        self.train_kmedoids_nmi(clustering_metrics["kmedoids_nmi"])
+        self.train_mean_ari(clustering_metrics["mean_ari"])
+        self.train_mean_nmi(clustering_metrics["mean_nmi"])
+        self.train_mean_clustering_score(clustering_metrics["mean_clustering_score"])
+
+        # Log metrics using torchmetrics
+        self.log("train_kmeans_ari", self.train_kmeans_ari, on_step=False, on_epoch=True)
+        self.log("train_kmeans_nmi", self.train_kmeans_nmi, on_step=False, on_epoch=True)
+        self.log("train_kmedoids_ari", self.train_kmedoids_ari, on_step=False, on_epoch=True)
+        self.log("train_kmedoids_nmi", self.train_kmedoids_nmi, on_step=False, on_epoch=True)
+        self.log("train_mean_ari", self.train_mean_ari, on_step=False, on_epoch=True)
+        self.log("train_mean_nmi", self.train_mean_nmi, on_step=False, on_epoch=True)
+        self.log("train_mean_clustering_score", self.train_mean_clustering_score, on_step=False, on_epoch=True)
+
+        return loss
+
+    def validation_step(self, batch: Any, batch_idx: int) -> torch.Tensor:
+        fragments: torch.Tensor = batch.fragments
+        source_ids: torch.Tensor = batch.source_ids
+        loss: torch.Tensor
+
+        if self.model_type == "supervised":
+            # Supervised learning: predict source image ID
+            logits, embeddings = self(fragments)
+            loss = self.criterion(logits, source_ids)
+
+            # Update accuracy using torchmetrics
+            if self.val_accuracy is not None:
+                self.val_accuracy(logits, source_ids)
+
+            self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+            if self.val_accuracy is not None:
+                self.log("val_accuracy", self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        else:
+            # Autoencoder: reconstruction loss
+            reconstructed, embeddings = self(fragments)
+            loss = self.criterion(reconstructed, fragments)
+            self.log("val_recon_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        # Clustering metrics for all models
+        clustering_metrics = self._compute_clustering_metrics(embeddings, source_ids)
+
+        # Update torchmetrics
+        self.val_kmeans_ari(clustering_metrics["kmeans_ari"])
+        self.val_kmeans_nmi(clustering_metrics["kmeans_nmi"])
+        self.val_kmedoids_ari(clustering_metrics["kmedoids_ari"])
+        self.val_kmedoids_nmi(clustering_metrics["kmedoids_nmi"])
+        self.val_mean_ari(clustering_metrics["mean_ari"])
+        self.val_mean_nmi(clustering_metrics["mean_nmi"])
+        self.val_mean_clustering_score(clustering_metrics["mean_clustering_score"])
+
+        # Log metrics using torchmetrics
+        self.log("val_kmeans_ari", self.val_kmeans_ari, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_kmeans_nmi", self.val_kmeans_nmi, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_kmedoids_ari", self.val_kmedoids_ari, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_kmedoids_nmi", self.val_kmedoids_nmi, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_mean_ari", self.val_mean_ari, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_mean_nmi", self.val_mean_nmi, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "val_mean_clustering_score", self.val_mean_clustering_score, on_step=False, on_epoch=True, prog_bar=True
+        )
+
+        return loss
+
+    def configure_optimizers(self) -> Any:
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=5, min_lr=1e-7, verbose=True
+            optimizer, mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=True
         )
 
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss", "frequency": 1},
+            "lr_scheduler": {"scheduler": scheduler, "monitor": "val_mean_clustering_score", "frequency": 1},
         }
 
-
-class ImageNet64Trainer:
-    """
-    Training pipeline for ImageNet-64 classification models using PyTorch Lightning.
-    """
-
-    def __init__(
-        self,
-        data_path: str,
-        model_config: dict[str, Any],
-        training_config: dict[str, Any],
-        output_dir: str = "outputs",
-    ):
-        """
-        Initialize trainer.
-
-        Parameters
-        ----------
-        data_path : str
-            Path to ImageNet-64 dataset
-        model_config : Dict[str, Any]
-            Model configuration parameters
-        training_config : Dict[str, Any]
-            Training configuration parameters
-        output_dir : str
-            Directory to save outputs
-        """
-        self.data_path = Path(data_path)
-        self.model_config = model_config
-        self.training_config = training_config
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Initialize Lightning module
-        self.lightning_module = ImageNet64LightningModule(model_config, training_config)
-
-        # Initialize data loaders
-        self._setup_data()
-
-        # Training results
-        self.trainer_results = None
-
-    def _setup_data(self) -> None:
-        """Setup data loaders."""
-        batch_size = self.training_config.get("batch_size", 32)
-        num_workers = self.training_config.get("num_workers", 4)
-
-        # Training dataset with augmentation
-        train_transform = (
-            get_augmentation_transforms(training=True) if self.training_config.get("augmentation", True) else None
-        )
-        self.train_dataset = ImageNet64Dataset(self.data_path, split="train", transform=train_transform)
-
-        # Validation dataset without augmentation
-        val_transform = get_augmentation_transforms(training=False)
-        self.val_dataset = ImageNet64Dataset(self.data_path, split="test", transform=val_transform)
-
-        # Create data loaders
-        self.train_loader = DataLoader(
-            self.train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=num_workers,
-            pin_memory=True,
-            persistent_workers=num_workers > 0,
-        )
-
-        self.val_loader = DataLoader(
-            self.val_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=True,
-            persistent_workers=num_workers > 0,
-        )
-
-        logger.info(f"Training samples: {len(self.train_dataset)}")
-        logger.info(f"Validation samples: {len(self.val_dataset)}")
-        logger.info(f"Batch size: {batch_size}")
-        logger.info(f"Training batches per epoch: {len(self.train_loader)}")
-        logger.info(f"Validation batches: {len(self.val_loader)}")
-
-    def _create_callbacks(self) -> list[pl.callbacks.Callback]:
-        """Create PyTorch Lightning callbacks."""
+    def configure_callbacks(self) -> list[pl.callbacks.Callback]:
         callbacks: list[pl.callbacks.Callback] = []
 
-        # Model checkpoint
         checkpoint_path = self.output_dir / "checkpoints"
         checkpoint_path.mkdir(parents=True, exist_ok=True)
 
         callbacks.append(
             ModelCheckpoint(
                 dirpath=str(checkpoint_path),
-                filename="best_model-{epoch:02d}-{val_acc:.3f}",
-                monitor="val_acc",
+                filename="best_model-{epoch:02d}-{val_mean_clustering_score:.3f}",
+                monitor="val_mean_clustering_score",
                 mode="max",
                 save_top_k=1,
                 save_last=True,
@@ -228,297 +349,128 @@ class ImageNet64Trainer:
             )
         )
 
-        # Early stopping
-        if self.training_config.get("early_stopping", True):
-            callbacks.append(
-                EarlyStopping(
-                    monitor="val_acc", mode="max", patience=self.training_config.get("patience", 10), verbose=True
-                )
+        callbacks.append(
+            EarlyStopping(
+                monitor="val_mean_clustering_score",
+                mode="max",
+                patience=self.early_stopping_patience,
+                verbose=True,
+                min_delta=0.001,
             )
+        )
 
-        # Learning rate monitor
         callbacks.append(LearningRateMonitor(logging_interval="epoch"))
 
         return callbacks
 
-    def train(self) -> dict[str, Any]:
-        """
-        Train the model using PyTorch Lightning.
-
-        Returns
-        -------
-        Dict[str, Any]
-            Training results and metrics
-        """
-        logger.info("Starting training...")
-
-        # Create logger
-        csv_logger = CSVLogger(save_dir=str(self.output_dir), name="training_logs")
-
-        # Create PyTorch Lightning trainer
-        trainer = pl.Trainer(
-            max_epochs=self.training_config.get("epochs", 100),
-            callbacks=self._create_callbacks(),
-            logger=csv_logger,
-            accelerator="auto",
-            devices="auto",
-            precision=self.training_config.get("precision", 32),
-            gradient_clip_val=self.training_config.get("gradient_clip_val", 0.0),
-            accumulate_grad_batches=self.training_config.get("accumulate_grad_batches", 1),
-            log_every_n_steps=50,
-            enable_progress_bar=True,
-            enable_model_summary=True,
-        )
-
-        # Determine checkpoint to resume from if available
-        ckpt_dir = self.output_dir / "checkpoints"
-        ckpt_path = None
-        try:
-            last_ckpt = ckpt_dir / "last.ckpt"
-            if last_ckpt.exists():
-                ckpt_path = str(last_ckpt)
-                logger.info(f"Resuming training from checkpoint: {ckpt_path}")
-        except Exception:
-            ckpt_path = None
-
-        # Train (with resume if checkpoint exists)
-        trainer.fit(
-            self.lightning_module,
-            train_dataloaders=self.train_loader,
-            val_dataloaders=self.val_loader,
-            ckpt_path=ckpt_path,
-        )
-
-        # Save final model (Lightning checkpoint)
-        model_path = self.output_dir / "final_model.ckpt"
-        trainer.save_checkpoint(str(model_path))
-        logger.info(f"Saved final model to {model_path}")
-
-        # Additionally save a CPU-friendly state dict for local inference
+    def on_train_end(self) -> None:
+        # Save final model state dict
         state_dict_path = self.output_dir / "model_state_dict.pt"
         try:
-            cpu_state = {k: v.cpu() for k, v in self.lightning_module.model.state_dict().items()}
+            cpu_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(cpu_state, state_dict_path)
-            logger.info(f"Saved model state_dict to {state_dict_path}")
         except Exception as e:
             logger.warning(f"Failed to save CPU state_dict: {e}")
 
-        # Generate training plots
-        self._plot_training_history(csv_logger.log_dir)
+        # Save training info
+        training_info = {
+            "model_config": {
+                "model_type": self.model_type,
+                "encoder_channels": self.encoder_channels,
+                "latent_dim": self.latent_dim,
+                "input_size": 16,
+                "input_channels": 3,
+                "num_classes": self.num_classes if self.model_type == "supervised" else None,
+            },
+            "training_config": {
+                "images_per_batch": self.images_per_batch,
+                "batch_size": self.batch_size,
+                "epochs": self.epochs,
+                "learning_rate": self.learning_rate,
+                "weight_decay": self.weight_decay,
+                "early_stopping_patience": self.early_stopping_patience,
+                "steps_per_epoch": self.steps_per_epoch,
+            },
+            "model_parameters": count_parameters(self.model),
+        }
 
-        # Evaluate model
-        results = self.evaluate(trainer)
+        with open(self.output_dir / "training_info.json", "w") as f:
+            json.dump(training_info, f, indent=2)
 
-        return results
-
-    def evaluate(self, trainer: pl.Trainer | None = None, ckpt_path: str | None = None) -> dict[str, Any]:
-        """
-        Evaluate the trained model.
-
-        Parameters
-        ----------
-        trainer : pl.Trainer, optional
-            PyTorch Lightning trainer instance
-
-        Returns
-        -------
-        Dict[str, Any]
-            Evaluation metrics
-        """
-        logger.info("Evaluating model...")
-
-        if trainer is None:
-            # Create a new trainer for evaluation
-            trainer = pl.Trainer(accelerator="auto", devices="auto", logger=False, enable_progress_bar=True)
-
-        # Optionally load checkpoint weights for evaluation
-        if ckpt_path:
-            try:
-                ckpt = torch.load(ckpt_path, map_location="cpu")
-                if "state_dict" in ckpt:
-                    self.lightning_module.load_state_dict(ckpt["state_dict"], strict=False)
-                    logger.info(f"Loaded Lightning state_dict from {ckpt_path}")
-                else:
-                    # if a plain model state dict
-                    self.lightning_module.model.load_state_dict(ckpt, strict=False)
-                    logger.info(f"Loaded model state_dict from {ckpt_path}")
-            except Exception as e:
-                logger.warning(f"Could not load checkpoint for evaluation: {e}")
-
-        # Test the model
-        test_results = trainer.test(self.lightning_module, dataloaders=self.val_loader, verbose=True)
-
-        # Extract results
-        eval_results = test_results[0] if test_results else {}
-
-        logger.info("Evaluation Results:")
-        for metric, value in eval_results.items():
-            logger.info(f"  {metric}: {value:.4f}")
-
-        # Save results
-        results_path = self.output_dir / "evaluation_results.json"
-        with open(results_path, "w") as f:
-            json.dump(eval_results, f, indent=2)
-
-        # Ensure a concrete dict type for callers / typing
-        return dict(eval_results)
-
-    def _plot_training_history(self, log_dir: str) -> None:
-        """Plot training history from CSV logs."""
-        import pandas as pd
-
-        try:
-            # Read metrics from CSV log
-            csv_path = Path(log_dir) / "metrics.csv"
-            if not csv_path.exists():
-                logger.warning(f"No metrics file found at {csv_path}")
-                return
-
-            df = pd.read_csv(csv_path)
-
-            # Filter out NaN values and group by epoch
-            df = df.dropna()
-
-            _fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-
-            # Accuracy
-            if "train_acc_epoch" in df.columns and "val_acc" in df.columns:
-                train_acc = df.dropna(subset=["train_acc_epoch"])
-                val_acc = df.dropna(subset=["val_acc"])
-
-                axes[0, 0].plot(train_acc["epoch"], train_acc["train_acc_epoch"], label="Training")
-                axes[0, 0].plot(val_acc["epoch"], val_acc["val_acc"], label="Validation")
-                axes[0, 0].set_title("Model Accuracy")
-                axes[0, 0].set_xlabel("Epoch")
-                axes[0, 0].set_ylabel("Accuracy")
-                axes[0, 0].legend()
-
-            # Loss
-            if "train_loss_epoch" in df.columns and "val_loss" in df.columns:
-                train_loss = df.dropna(subset=["train_loss_epoch"])
-                val_loss = df.dropna(subset=["val_loss"])
-
-                axes[0, 1].plot(train_loss["epoch"], train_loss["train_loss_epoch"], label="Training")
-                axes[0, 1].plot(val_loss["epoch"], val_loss["val_loss"], label="Validation")
-                axes[0, 1].set_title("Model Loss")
-                axes[0, 1].set_xlabel("Epoch")
-                axes[0, 1].set_ylabel("Loss")
-                axes[0, 1].legend()
-
-            # Top-5 Accuracy
-            if "train_top5_acc" in df.columns and "val_top5_acc" in df.columns:
-                train_top5 = df.dropna(subset=["train_top5_acc"])
-                val_top5 = df.dropna(subset=["val_top5_acc"])
-
-                axes[1, 0].plot(train_top5["epoch"], train_top5["train_top5_acc"], label="Training")
-                axes[1, 0].plot(val_top5["epoch"], val_top5["val_top5_acc"], label="Validation")
-                axes[1, 0].set_title("Top-5 Accuracy")
-                axes[1, 0].set_xlabel("Epoch")
-                axes[1, 0].set_ylabel("Top-5 Accuracy")
-                axes[1, 0].legend()
-
-            # Learning Rate
-            if "lr-Adam" in df.columns:
-                lr_data = df.dropna(subset=["lr-Adam"])
-                axes[1, 1].plot(lr_data["epoch"], lr_data["lr-Adam"])
-                axes[1, 1].set_title("Learning Rate")
-                axes[1, 1].set_xlabel("Epoch")
-                axes[1, 1].set_ylabel("Learning Rate")
-                axes[1, 1].set_yscale("log")
-
-            plt.tight_layout()
-            plot_path = self.output_dir / "training_history.png"
-            plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-            plt.close()
-
-            logger.info(f"Saved training plots to {plot_path}")
-
-        except Exception as e:
-            logger.warning(f"Could not create training plots: {e}")
-
-    def predict_sample(self, n_samples: int = 10) -> None:
-        """
-        Make predictions on sample images and visualize results.
-
-        Parameters
-        ----------
-        n_samples : int
-            Number of samples to predict
-        """
-        # Get sample batch from validation loader
-        self.lightning_module.eval()
-
-        with torch.no_grad():
-            # Get a batch from validation loader
-            data_iter = iter(self.val_loader)
-            x_batch, y_batch = next(data_iter)
-
-            # Limit to n_samples
-            x_batch = x_batch[:n_samples]
-            y_batch = y_batch[:n_samples]
-
-            # Make predictions
-            logits = self.lightning_module(x_batch)
-            predictions = torch.softmax(logits, dim=1)
-            predicted_classes = torch.argmax(predictions, dim=1)
-
-        # Convert to numpy for plotting
-        x_batch_np = x_batch.cpu().numpy()
-        y_batch_np = y_batch.cpu().numpy()
-        predicted_classes_np = predicted_classes.cpu().numpy()
-
-        # Plot results
-        _fig, axes = plt.subplots(2, 5, figsize=(15, 6))
-        axes = axes.ravel()
-
-        for i in range(min(n_samples, 10)):
-            # Display image (convert from CHW to HWC)
-            img = x_batch_np[i].transpose(1, 2, 0)
-
-            # Denormalize if needed
-            if img.max() <= 1.0:
-                img = np.clip(img, 0, 1)
-
-            axes[i].imshow(img)
-            axes[i].set_title(f"True: {y_batch_np[i]}\nPred: {predicted_classes_np[i]}")
-            axes[i].axis("off")
-
-        plt.tight_layout()
-        plot_path = self.output_dir / "sample_predictions.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-
-        logger.info(f"Saved sample predictions to {plot_path}")
-
-
-def load_config(config_path: str) -> dict[str, Any]:
-    """Load configuration from JSON file."""
-    from typing import cast
-
-    with open(config_path) as f:
-        data = json.load(f)
-    return cast(dict[str, Any], data)
+    @classmethod
+    def load_from_checkpoint(
+        cls,
+        checkpoint_path: Any,  # Compatible with supertype: Any | IO[Any]
+        map_location: torch.device | str | dict[str, str] | None = None,
+        hparams_file: str | Path | None = None,
+        strict: bool | None = True,
+        **kwargs: Any,
+    ) -> FragmentAutoencoderTrainer:
+        instance: FragmentAutoencoderTrainer = super().load_from_checkpoint(
+            str(checkpoint_path),
+            map_location=map_location,
+            hparams_file=str(hparams_file) if hparams_file is not None else None,
+            strict=strict,
+            **kwargs,
+        )
+        return instance
 
 
 if __name__ == "__main__":
-    # Example usage
-    model_config = {"architecture": "simple", "num_classes": 1000}
+    # Example usage for all 4 model types
+    model_configs = [
+        {"model_type": "conv", "output_dir": "outputs/conv_autoencoder", "description": "Convolutional Autoencoder"},
+        {
+            "model_type": "linear",
+            "output_dir": "outputs/linear_autoencoder",
+            "description": "Multi-layer Linear Autoencoder",
+        },
+        {
+            "model_type": "pca",
+            "output_dir": "outputs/pca_autoencoder",
+            "description": "PCA-like Single Layer Autoencoder",
+        },
+        {
+            "model_type": "supervised",
+            "output_dir": "outputs/supervised_classifier",
+            "description": "Supervised Fragment Classifier",
+        },
+    ]
 
-    training_config = {
-        "batch_size": 32,
-        "epochs": 50,
-        "learning_rate": 0.001,
-        "weight_decay": 1e-4,
-        "augmentation": True,
-        "early_stopping": True,
-        "patience": 10,
-        "num_workers": 4,
-    }
-
-    trainer = ImageNet64Trainer(
-        data_path="data/imagenet64", model_config=model_config, training_config=training_config, output_dir="outputs"
+    # Train the first model (conv) as example
+    config = model_configs[0]
+    trainer = FragmentAutoencoderTrainer(
+        data_path="data/train_data",
+        model_type=config["model_type"],
+        images_per_batch=10,
+        batch_size=8,
+        epochs=100,
+        learning_rate=1e-3,
+        encoder_channels=[32, 64],
+        latent_dim=128,
+        output_dir=config["output_dir"],
+        num_classes=1000,  # For supervised model
     )
 
-    results = trainer.train()
-    print("Training completed!")
-    print(f"Final test accuracy: {results.get('test_acc', 0):.4f}")
+    print(f"Training {config['description']} with {count_parameters(trainer.model):,} parameters")
+
+    # Train using PyTorch Lightning Trainer
+    pl_trainer = pl.Trainer(
+        max_epochs=trainer.epochs,
+        callbacks=trainer.configure_callbacks(),
+        logger=CSVLogger(save_dir=str(trainer.output_dir), name="training_logs"),
+        accelerator="auto",
+        devices="auto",
+        precision=32,
+        log_every_n_steps=10,
+        enable_progress_bar=True,
+        enable_model_summary=True,
+        gradient_clip_val=1.0,
+    )
+
+    pl_trainer.fit(trainer)
+    print(f"Training completed! Check {trainer.output_dir} for results.")
+
+    print("\nTo train other models, change model_type to:")
+    for i, config in enumerate(model_configs[1:], 1):
+        print(f"  {i + 1}. '{config['model_type']}' - {config['description']}")

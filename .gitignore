@@ -110,3 +110,6 @@ docs/_build/
 
 # Allow tutorial templates to be tracked
 !scratch/docs/templates/**
+ 
+# Ensure data/ is tracked (overrides global extension ignores)
+!data/**

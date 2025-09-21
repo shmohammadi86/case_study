@@ -1,29 +1,39 @@
 """
 ImageNet-64 Case Study Package
 
-A complete implementation for ImageNet-64 image classification including:
+A focused implementation for image processing with convolutional autoencoders including:
 - Dataset loading and preprocessing
-- CNN model architectures
+- Convolutional autoencoder architecture
 - Training pipeline
 - Evaluation tools
 """
+# isort: skip_file
 
-from .data import Imagenet64, get_augmentation_transforms, normalize_img
-from .download import create_sample_data, download_imagenet64, setup_data_structure
-from .models import create_cnn_model, create_transfer_learning_model
-from .trainer import ImageNet64Trainer
+from .datasets import FragmentBatch, FragmentBatchDataset, ImageNet64Dataset, Imagenet64
+from .models import ConvAutoencoder, count_parameters, create_autoencoder
+from .modules import ConvBlock, DeconvBlock
+from .trainer import FragmentAutoencoderTrainer
+from .transforms import get_augmentation_transforms, normalize_img
 
 __version__ = "1.0.0"
 __author__ = "Shahin Mohammadi"
 
 __all__ = [
+    # Datasets
+    "ImageNet64Dataset",
     "Imagenet64",
+    "FragmentBatchDataset",
+    "FragmentBatch",
+    # Models
+    "ConvAutoencoder",
+    "create_autoencoder",
+    "count_parameters",
+    # Modules
+    "ConvBlock",
+    "DeconvBlock",
+    # Transforms
     "normalize_img",
     "get_augmentation_transforms",
-    "create_cnn_model",
-    "create_transfer_learning_model",
-    "ImageNet64Trainer",
-    "download_imagenet64",
-    "setup_data_structure",
-    "create_sample_data",
+    # Training
+    "FragmentAutoencoderTrainer",
 ]
