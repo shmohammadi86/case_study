@@ -2,40 +2,101 @@ import numpy as np
 from pathlib import Path
 import os
 import pickle
-import tensorflow as tf
+from typing import Optional, Tuple
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 from tqdm import tqdm
 
 N_CLASSES = 1000
 IMAGE_SIZE = (64, 64)
 
 
-def normalize_img(img_batch):
-    with tf.device("cpu:0"):
-        img_tensor = tf.convert_to_tensor(img_batch, dtype=tf.float32)
-        normalized_tensor = img_tensor / 255.0
+def normalize_img(img_batch: np.ndarray) -> torch.Tensor:
+    """
+    Normalize image batch from [0, 255] to [0, 1] range.
+
+    Parameters
+    ----------
+    img_batch : np.ndarray
+        Image batch with values in [0, 255] range
+
+    Returns
+    -------
+    torch.Tensor
+        Normalized tensor with values in [0, 1] range
+    """
+    img_tensor = torch.from_numpy(img_batch).float()
+    normalized_tensor = img_tensor / 255.0
     return normalized_tensor
 
 
-def init_augmentor():
-    return tf.keras.preprocessing.image.ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        # shear_range=10,
-        # zoom_range=0.1,
-        channel_shift_range=0.2,
-        fill_mode="reflect",
-    )
+def get_augmentation_transforms(training: bool = True) -> transforms.Compose:
+    """
+    Get data augmentation transforms for training or validation.
+
+    Parameters
+    ----------
+    training : bool
+        Whether to apply training augmentations
+
+    Returns
+    -------
+    transforms.Compose
+        Composed transforms
+    """
+    if training:
+        return transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.RandomRotation(20),
+            transforms.RandomHorizontalFlip(0.5),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+            transforms.ToTensor(),
+        ])
+    else:
+        return transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.ToTensor(),
+        ])
 
 
-class Imagenet64(object):
-    def __init__(self, data_path):
+class ImageNet64Dataset(Dataset):
+    """
+    PyTorch Dataset for ImageNet-64 data.
+    
+    Parameters
+    ----------
+    data_path : str or Path
+        Path to the ImageNet-64 data directory
+    split : str
+        Dataset split ('train' or 'test')
+    transform : transforms.Compose, optional
+        Transforms to apply to images
+    """
+    
+    def __init__(self, data_path: str, split: str = 'train', transform: Optional[transforms.Compose] = None):
         self.data_path = Path(str(data_path))
-
+        self.split = split
+        self.transform = transform
+        
+        if split == 'train':
+            self.images, self.labels = self._load_train_data()
+        elif split == 'test':
+            self.images, self.labels = self._load_test_data()
+        else:
+            raise ValueError(f"Invalid split: {split}. Must be 'train' or 'test'")
+            
+        # Validate data
+        assert len(self.images) == len(self.labels)
+        assert len(np.unique(self.labels)) <= N_CLASSES
+        
+    def _load_train_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Load training data from pickle files."""
         train_files = os.listdir(self.data_path / "train_data")
         x_train = []
         y_train = []
-        for train_file in train_files:
+        
+        for train_file in tqdm(train_files, desc="Loading training data"):
             with open(self.data_path / "train_data" / train_file, "rb") as fo:
                 data = pickle.load(fo)
                 x = (
@@ -43,16 +104,18 @@ class Imagenet64(object):
                     .reshape((data["data"].shape[0], 3, 64, 64))
                     .transpose((0, 2, 3, 1))
                 )
-                y = np.array(data["labels"]) - 1
-
+                y = np.array(data["labels"]) - 1  # Convert to 0-based indexing
+                
                 x_train.append(x)
                 y_train.append(y)
-        del x, y
+                
         x_train = np.concatenate(x_train, axis=0)
         y_train = np.concatenate(y_train, axis=0)
-
-        assert x_train.shape[0] == len(y_train)
-
+        
+        return x_train, y_train
+    
+    def _load_test_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Load test data from pickle file."""
         with open(self.data_path / "dev_data/dev_data_batch_1", "rb") as fo:
             data = pickle.load(fo)
             x_test = (
@@ -60,49 +123,58 @@ class Imagenet64(object):
                 .reshape((data["data"].shape[0], 3, 64, 64))
                 .transpose((0, 2, 3, 1))
             )
-            y_test = np.array(data["labels"]) - 1
+            y_test = np.array(data["labels"]) - 1  # Convert to 0-based indexing
+            
+        return x_test, y_test
+    
+    def __len__(self) -> int:
+        return len(self.labels)
+    
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.images[idx]
+        label = self.labels[idx]
+        
+        # Convert to uint8 for PIL compatibility
+        image = image.astype(np.uint8)
+        
+        if self.transform:
+            image = self.transform(image)
+        else:
+            # Default: convert to tensor and normalize
+            image = torch.from_numpy(image).float() / 255.0
+            image = image.permute(2, 0, 1)  # HWC to CHW
+            
+        label = torch.tensor(label, dtype=torch.long)
+        
+        return image, label
 
+
+class Imagenet64:
+    """
+    Legacy wrapper class for backward compatibility.
+    Use ImageNet64Dataset for new implementations.
+    """
+    
+    def __init__(self, data_path: str):
+        self.data_path = Path(str(data_path))
+        
+        # Load all data into memory for legacy compatibility
+        train_dataset = ImageNet64Dataset(data_path, split='train')
+        test_dataset = ImageNet64Dataset(data_path, split='test')
+        
         self.data = {
-            "x_train": x_train,
-            "y_train": y_train,
-            "x_test": x_test,
-            "y_test": y_test,
+            "x_train": train_dataset.images,
+            "y_train": train_dataset.labels,
+            "x_test": test_dataset.images,
+            "y_test": test_dataset.labels,
         }
-
-        n_classes = 1000
+        
+        # Validate data
+        n_classes = N_CLASSES
         assert (
-            len(np.unique(self.data["y_train"])) == n_classes and
+            len(np.unique(self.data["y_train"])) <= n_classes and
             len(np.unique(self.data["y_train"])) >= len(np.unique(self.data["y_test"]))
         )
-
-    def datagen_cls(self, batch_size, ds="train", augmentation=False):
-        epoch_i = 0
-        ds_size = len(self.data[f"y_{ds}"])
-
-        augmentor = init_augmentor()
-
-        while True:
-            np.random.seed(epoch_i)
-            perm = np.random.permutation(ds_size)
-
-            for i in range(0, ds_size, batch_size):
-                selection = perm[i : i + batch_size]
-
-                if len(selection) < batch_size:
-                    continue
-
-                x, y = self.data[f"x_{ds}"][selection], self.data[f"y_{ds}"][selection]
-
-                x = normalize_img(x)
-
-                if augmentation:
-                    x, y = next(augmentor.flow(x, y, batch_size=batch_size))
-
-                # x: images
-                # y: labels - you can ignore, not important here
-                yield x, y
-
-            epoch_i += 1
 
 
 if __name__ == "__main__":
