@@ -1,19 +1,13 @@
 {
-  // ─── STOP EVERYTHING ON SAVE ───
-  "editor.formatOnSave": true,          // disables all formatters
-  "editor.formatOnPaste": true,         // optional, but quieter
-  "editor.codeActionsOnSave": {},        // disables all code-action hooks
-
-  // ─── your other prefs below ───
-  "python.testing.pytestArgs": [ "tests" ],
-  "python.testing.unittestEnabled": false,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true
+  },
+  "editor.defaultFormatter": "charliermarsh.ruff",
   "python.testing.pytestEnabled": true,
-  "python.terminal.activateEnvInCurrentTerminal": true,
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
   "terminal.integrated.defaultProfile.linux": "bash",
   "editor.tabSize": 4,
-  "git.ignoreLimitWarning": true,
-  "editor.defaultFormatter": "charliermarsh.ruff",
-  "cursor.general.disableHttp2": true,
-  "cursor.general.disableHttp1SSE": true
+  "git.ignoreLimitWarning": true
 }

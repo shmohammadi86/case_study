@@ -1,118 +1,35 @@
-# Pre-commit configuration for automated code quality checks
-# See https://pre-commit.com for more information
-
 repos:
-  # Only keep hooks that CANNOT be replicated with nox/tools
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-      # Git/Repository specific (cannot be replicated)
-      - id: check-case-conflict
       - id: check-merge-conflict
-      - id: check-vcs-permalinks
-
-      # Security/System specific (cannot be replicated)
-      - id: check-executables-have-shebangs
-      - id: check-symlinks  
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: detect-private-key
       - id: check-added-large-files
-        args: ['--maxkb=1000']
+        args: ["--maxkb=1000"]
 
-      # File system specific (cannot be replicated)
-      - id: check-byte-order-marker
-
-  # Nox-based hooks for everything else
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
     hooks:
-      # File validation (replaces check-json, check-yaml, check-toml, check-ast)
-      - id: file-validation
-        name: file-validation
-        entry: nox -f noxfile.py -s file_validation-3.12
-        language: system
-        types: [json, yaml, toml, python]
-        require_serial: false
-        pass_filenames: false
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
 
-      # File formatting (replaces trailing-whitespace, end-of-file-fixer, mixed-line-ending)
-      - id: file-formatting-check
-        name: file-formatting-check
-        entry: nox -f noxfile.py -s file_formatting_check-3.12
-        language: system
-        types: [python, text, yaml, json, toml, markdown]
-        require_serial: false
-        pass_filenames: false
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        args: ["--ignore-missing-imports"]
 
-      - id: file-formatting-fix
-        name: file-formatting-fix
-        entry: nox -f noxfile.py -s file_formatting_fix-3.12
-        language: system
-        types: [python, text, yaml, json, toml, markdown]
-        require_serial: false
-        pass_filenames: false
-
-      # Code quality (replaces debug-statements, check-docstring-first, check-builtin-literals)
-      - id: formatting-check
-        name: formatting-check
-        entry: nox -f noxfile.py -s formatting_check-3.12
-        language: system
-        types: [python]
-        require_serial: false
-        pass_filenames: false
-
-      - id: formatting-fix
-        name: formatting-fix
-        entry: nox -f noxfile.py -s formatting_fix-3.12
-        language: system
-        types: [python]
-        require_serial: false
-        pass_filenames: false
-
-      - id: linting-check
-        name: linting-check
-        entry: nox -f noxfile.py -s linting_check-3.12
-        language: system
-        types: [python]
-        require_serial: false
-        pass_filenames: false
-
-      - id: linting-fix
-        name: linting-fix
-        entry: nox -f noxfile.py -s linting_fix-3.12
-        language: system
-        types: [python]
-        require_serial: false
-        pass_filenames: false
-
-      - id: typing-check
-        name: typing-check
-        entry: nox -f noxfile.py -s typing_check-3.12
-        language: system
-        types: [python]
-        require_serial: true
-        pass_filenames: false
-
-      - id: test-check
-        name: test-check
-        entry: nox -f noxfile.py -s test-3.12
-        language: system
-        types: [python]
-        pass_filenames: false
-
-# Configuration
 default_language_version:
   python: python3.12
 
 fail_fast: true
-
-ci:
-  autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit hooks
-
-    For more information, see https://pre-commit.ci
-  autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
-  autoupdate_schedule: weekly
-  skip: []
-  submodules: false
 
 
