@@ -109,10 +109,10 @@ class ImageNet64Dataset(Dataset):
                 x_train.append(x)
                 y_train.append(y)
 
-        x_train = np.concatenate(x_train, axis=0)
-        y_train = np.concatenate(y_train, axis=0)
+        x_train_arr: np.ndarray = np.concatenate(x_train, axis=0)
+        y_train_arr: np.ndarray = np.concatenate(y_train, axis=0)
 
-        return x_train, y_train
+        return x_train_arr, y_train_arr
 
     def _load_test_data(self) -> tuple[np.ndarray, np.ndarray]:
         """Load test data from pickle file."""
