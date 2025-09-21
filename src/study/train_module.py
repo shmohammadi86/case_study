@@ -26,6 +26,9 @@ class FragmentAE(pl.LightningModule):
         self.save_hyperparameters()
         self.model = FragmentAutoencoder(embedding_dim=embedding_dim)
         self.criterion = nn.MSELoss()
+        # Explicit attributes (avoid accessing self.hparams in type context)
+        self.lr: float = float(lr)
+        self.weight_decay: float = float(weight_decay)
 
     def forward(self, fragments: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Returns reconstruction and embeddings
@@ -46,5 +49,5 @@ class FragmentAE(pl.LightningModule):
         self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
 
     def configure_optimizers(self) -> Any:
-        optimizer = optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer

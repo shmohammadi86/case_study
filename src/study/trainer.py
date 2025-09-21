@@ -1,6 +1,7 @@
 """
 Training Pipeline for ImageNet-64 Classification using PyTorch Lightning
 """
+
 import json
 import logging
 from pathlib import Path
@@ -21,16 +22,13 @@ from .models import count_parameters, create_cnn_model, create_transfer_learning
 
 logger = logging.getLogger(__name__)
 
+
 class ImageNet64LightningModule(pl.LightningModule):
     """
     PyTorch Lightning module for ImageNet-64 classification.
     """
 
-    def __init__(
-        self,
-        model_config: dict[str, Any],
-        training_config: dict[str, Any]
-    ):
+    def __init__(self, model_config: dict[str, Any], training_config: dict[str, Any]):
         super().__init__()
         self.save_hyperparameters()
 
@@ -42,12 +40,12 @@ class ImageNet64LightningModule(pl.LightningModule):
             self.model = create_transfer_learning_model(
                 base_model_name=self.model_config.get("base_model", "resnet50"),
                 num_classes=self.model_config.get("num_classes", 1000),
-                trainable_layers=self.model_config.get("trainable_layers", 0)
+                trainable_layers=self.model_config.get("trainable_layers", 0),
             )
         else:
             self.model = create_cnn_model(
                 num_classes=self.model_config.get("num_classes", 1000),
-                architecture=self.model_config.get("architecture", "simple")
+                architecture=self.model_config.get("architecture", "simple"),
             )
 
         # Metrics
@@ -61,10 +59,10 @@ class ImageNet64LightningModule(pl.LightningModule):
 
         logger.info(f"Created model with {count_parameters(self.model):,} parameters")
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = F.cross_entropy(logits, y)
@@ -74,13 +72,13 @@ class ImageNet64LightningModule(pl.LightningModule):
         self.train_top5_accuracy(logits, y)
 
         # Log metrics
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('train_top5_acc', self.train_top5_accuracy, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train_acc", self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_top5_acc", self.train_top5_accuracy, on_step=False, on_epoch=True)
 
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = F.cross_entropy(logits, y)
@@ -90,13 +88,13 @@ class ImageNet64LightningModule(pl.LightningModule):
         self.val_top5_accuracy(logits, y)
 
         # Log metrics
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_top5_acc', self.val_top5_accuracy, on_step=False, on_epoch=True)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_acc", self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_top5_acc", self.val_top5_accuracy, on_step=False, on_epoch=True)
 
         return loss
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = batch
         logits = self(x)
         loss = F.cross_entropy(logits, y)
@@ -106,35 +104,26 @@ class ImageNet64LightningModule(pl.LightningModule):
         self.test_top5_accuracy(logits, y)
 
         # Log metrics
-        self.log('test_loss', loss, on_step=False, on_epoch=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True)
-        self.log('test_top5_acc', self.test_top5_accuracy, on_step=False, on_epoch=True)
+        self.log("test_loss", loss, on_step=False, on_epoch=True)
+        self.log("test_acc", self.test_accuracy, on_step=False, on_epoch=True)
+        self.log("test_top5_acc", self.test_top5_accuracy, on_step=False, on_epoch=True)
 
         return loss
 
-    def configure_optimizers(self):
+    def configure_optimizers(self) -> dict[str, Any]:
         optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.training_config.get("learning_rate", 0.001),
-            weight_decay=self.training_config.get("weight_decay", 1e-4)
+            weight_decay=self.training_config.get("weight_decay", 1e-4),
         )
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='min',
-            factor=0.5,
-            patience=5,
-            min_lr=1e-7,
-            verbose=True
+            optimizer, mode="min", factor=0.5, patience=5, min_lr=1e-7, verbose=True
         )
 
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val_loss",
-                "frequency": 1
-            }
+            "lr_scheduler": {"scheduler": scheduler, "monitor": "val_loss", "frequency": 1},
         }
 
 
@@ -148,11 +137,11 @@ class ImageNet64Trainer:
         data_path: str,
         model_config: dict[str, Any],
         training_config: dict[str, Any],
-        output_dir: str = "outputs"
+        output_dir: str = "outputs",
     ):
         """
         Initialize trainer.
-        
+
         Parameters
         ----------
         data_path : str
@@ -179,26 +168,20 @@ class ImageNet64Trainer:
         # Training results
         self.trainer_results = None
 
-    def _setup_data(self):
+    def _setup_data(self) -> None:
         """Setup data loaders."""
         batch_size = self.training_config.get("batch_size", 32)
         num_workers = self.training_config.get("num_workers", 4)
 
         # Training dataset with augmentation
-        train_transform = get_augmentation_transforms(training=True) if self.training_config.get("augmentation", True) else None
-        self.train_dataset = ImageNet64Dataset(
-            self.data_path,
-            split='train',
-            transform=train_transform
+        train_transform = (
+            get_augmentation_transforms(training=True) if self.training_config.get("augmentation", True) else None
         )
+        self.train_dataset = ImageNet64Dataset(self.data_path, split="train", transform=train_transform)
 
         # Validation dataset without augmentation
         val_transform = get_augmentation_transforms(training=False)
-        self.val_dataset = ImageNet64Dataset(
-            self.data_path,
-            split='test',
-            transform=val_transform
-        )
+        self.val_dataset = ImageNet64Dataset(self.data_path, split="test", transform=val_transform)
 
         # Create data loaders
         self.train_loader = DataLoader(
@@ -207,7 +190,7 @@ class ImageNet64Trainer:
             shuffle=True,
             num_workers=num_workers,
             pin_memory=True,
-            persistent_workers=True if num_workers > 0 else False
+            persistent_workers=num_workers > 0,
         )
 
         self.val_loader = DataLoader(
@@ -216,7 +199,7 @@ class ImageNet64Trainer:
             shuffle=False,
             num_workers=num_workers,
             pin_memory=True,
-            persistent_workers=True if num_workers > 0 else False
+            persistent_workers=num_workers > 0,
         )
 
         logger.info(f"Training samples: {len(self.train_dataset)}")
@@ -225,9 +208,9 @@ class ImageNet64Trainer:
         logger.info(f"Training batches per epoch: {len(self.train_loader)}")
         logger.info(f"Validation batches: {len(self.val_loader)}")
 
-    def _create_callbacks(self) -> list:
+    def _create_callbacks(self) -> list[pl.callbacks.Callback]:
         """Create PyTorch Lightning callbacks."""
-        callbacks = []
+        callbacks: list[pl.callbacks.Callback] = []
 
         # Model checkpoint
         checkpoint_path = self.output_dir / "checkpoints"
@@ -236,12 +219,12 @@ class ImageNet64Trainer:
         callbacks.append(
             ModelCheckpoint(
                 dirpath=str(checkpoint_path),
-                filename='best_model-{epoch:02d}-{val_acc:.3f}',
-                monitor='val_acc',
-                mode='max',
+                filename="best_model-{epoch:02d}-{val_acc:.3f}",
+                monitor="val_acc",
+                mode="max",
                 save_top_k=1,
                 save_last=True,
-                verbose=True
+                verbose=True,
             )
         )
 
@@ -249,22 +232,19 @@ class ImageNet64Trainer:
         if self.training_config.get("early_stopping", True):
             callbacks.append(
                 EarlyStopping(
-                    monitor='val_acc',
-                    mode='max',
-                    patience=self.training_config.get("patience", 10),
-                    verbose=True
+                    monitor="val_acc", mode="max", patience=self.training_config.get("patience", 10), verbose=True
                 )
             )
 
         # Learning rate monitor
-        callbacks.append(LearningRateMonitor(logging_interval='epoch'))
+        callbacks.append(LearningRateMonitor(logging_interval="epoch"))
 
         return callbacks
 
     def train(self) -> dict[str, Any]:
         """
         Train the model using PyTorch Lightning.
-        
+
         Returns
         -------
         Dict[str, Any]
@@ -273,24 +253,21 @@ class ImageNet64Trainer:
         logger.info("Starting training...")
 
         # Create logger
-        csv_logger = CSVLogger(
-            save_dir=str(self.output_dir),
-            name="training_logs"
-        )
+        csv_logger = CSVLogger(save_dir=str(self.output_dir), name="training_logs")
 
         # Create PyTorch Lightning trainer
         trainer = pl.Trainer(
             max_epochs=self.training_config.get("epochs", 100),
             callbacks=self._create_callbacks(),
             logger=csv_logger,
-            accelerator='auto',
-            devices='auto',
+            accelerator="auto",
+            devices="auto",
             precision=self.training_config.get("precision", 32),
             gradient_clip_val=self.training_config.get("gradient_clip_val", 0.0),
             accumulate_grad_batches=self.training_config.get("accumulate_grad_batches", 1),
             log_every_n_steps=50,
             enable_progress_bar=True,
-            enable_model_summary=True
+            enable_model_summary=True,
         )
 
         # Determine checkpoint to resume from if available
@@ -309,7 +286,7 @@ class ImageNet64Trainer:
             self.lightning_module,
             train_dataloaders=self.train_loader,
             val_dataloaders=self.val_loader,
-            ckpt_path=ckpt_path
+            ckpt_path=ckpt_path,
         )
 
         # Save final model (Lightning checkpoint)
@@ -334,15 +311,15 @@ class ImageNet64Trainer:
 
         return results
 
-    def evaluate(self, trainer: pl.Trainer = None, ckpt_path: str | None = None) -> dict[str, Any]:
+    def evaluate(self, trainer: pl.Trainer | None = None, ckpt_path: str | None = None) -> dict[str, Any]:
         """
         Evaluate the trained model.
-        
+
         Parameters
         ----------
         trainer : pl.Trainer, optional
             PyTorch Lightning trainer instance
-        
+
         Returns
         -------
         Dict[str, Any]
@@ -352,12 +329,7 @@ class ImageNet64Trainer:
 
         if trainer is None:
             # Create a new trainer for evaluation
-            trainer = pl.Trainer(
-                accelerator='auto',
-                devices='auto',
-                logger=False,
-                enable_progress_bar=True
-            )
+            trainer = pl.Trainer(accelerator="auto", devices="auto", logger=False, enable_progress_bar=True)
 
         # Optionally load checkpoint weights for evaluation
         if ckpt_path:
@@ -374,11 +346,7 @@ class ImageNet64Trainer:
                 logger.warning(f"Could not load checkpoint for evaluation: {e}")
 
         # Test the model
-        test_results = trainer.test(
-            self.lightning_module,
-            dataloaders=self.val_loader,
-            verbose=True
-        )
+        test_results = trainer.test(self.lightning_module, dataloaders=self.val_loader, verbose=True)
 
         # Extract results
         eval_results = test_results[0] if test_results else {}
@@ -389,10 +357,11 @@ class ImageNet64Trainer:
 
         # Save results
         results_path = self.output_dir / "evaluation_results.json"
-        with open(results_path, 'w') as f:
+        with open(results_path, "w") as f:
             json.dump(eval_results, f, indent=2)
 
-        return eval_results
+        # Ensure a concrete dict type for callers / typing
+        return dict(eval_results)
 
     def _plot_training_history(self, log_dir: str) -> None:
         """Plot training history from CSV logs."""
@@ -410,56 +379,56 @@ class ImageNet64Trainer:
             # Filter out NaN values and group by epoch
             df = df.dropna()
 
-            fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+            _fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
             # Accuracy
-            if 'train_acc_epoch' in df.columns and 'val_acc' in df.columns:
-                train_acc = df.dropna(subset=['train_acc_epoch'])
-                val_acc = df.dropna(subset=['val_acc'])
+            if "train_acc_epoch" in df.columns and "val_acc" in df.columns:
+                train_acc = df.dropna(subset=["train_acc_epoch"])
+                val_acc = df.dropna(subset=["val_acc"])
 
-                axes[0, 0].plot(train_acc['epoch'], train_acc['train_acc_epoch'], label='Training')
-                axes[0, 0].plot(val_acc['epoch'], val_acc['val_acc'], label='Validation')
-                axes[0, 0].set_title('Model Accuracy')
-                axes[0, 0].set_xlabel('Epoch')
-                axes[0, 0].set_ylabel('Accuracy')
+                axes[0, 0].plot(train_acc["epoch"], train_acc["train_acc_epoch"], label="Training")
+                axes[0, 0].plot(val_acc["epoch"], val_acc["val_acc"], label="Validation")
+                axes[0, 0].set_title("Model Accuracy")
+                axes[0, 0].set_xlabel("Epoch")
+                axes[0, 0].set_ylabel("Accuracy")
                 axes[0, 0].legend()
 
             # Loss
-            if 'train_loss_epoch' in df.columns and 'val_loss' in df.columns:
-                train_loss = df.dropna(subset=['train_loss_epoch'])
-                val_loss = df.dropna(subset=['val_loss'])
+            if "train_loss_epoch" in df.columns and "val_loss" in df.columns:
+                train_loss = df.dropna(subset=["train_loss_epoch"])
+                val_loss = df.dropna(subset=["val_loss"])
 
-                axes[0, 1].plot(train_loss['epoch'], train_loss['train_loss_epoch'], label='Training')
-                axes[0, 1].plot(val_loss['epoch'], val_loss['val_loss'], label='Validation')
-                axes[0, 1].set_title('Model Loss')
-                axes[0, 1].set_xlabel('Epoch')
-                axes[0, 1].set_ylabel('Loss')
+                axes[0, 1].plot(train_loss["epoch"], train_loss["train_loss_epoch"], label="Training")
+                axes[0, 1].plot(val_loss["epoch"], val_loss["val_loss"], label="Validation")
+                axes[0, 1].set_title("Model Loss")
+                axes[0, 1].set_xlabel("Epoch")
+                axes[0, 1].set_ylabel("Loss")
                 axes[0, 1].legend()
 
             # Top-5 Accuracy
-            if 'train_top5_acc' in df.columns and 'val_top5_acc' in df.columns:
-                train_top5 = df.dropna(subset=['train_top5_acc'])
-                val_top5 = df.dropna(subset=['val_top5_acc'])
+            if "train_top5_acc" in df.columns and "val_top5_acc" in df.columns:
+                train_top5 = df.dropna(subset=["train_top5_acc"])
+                val_top5 = df.dropna(subset=["val_top5_acc"])
 
-                axes[1, 0].plot(train_top5['epoch'], train_top5['train_top5_acc'], label='Training')
-                axes[1, 0].plot(val_top5['epoch'], val_top5['val_top5_acc'], label='Validation')
-                axes[1, 0].set_title('Top-5 Accuracy')
-                axes[1, 0].set_xlabel('Epoch')
-                axes[1, 0].set_ylabel('Top-5 Accuracy')
+                axes[1, 0].plot(train_top5["epoch"], train_top5["train_top5_acc"], label="Training")
+                axes[1, 0].plot(val_top5["epoch"], val_top5["val_top5_acc"], label="Validation")
+                axes[1, 0].set_title("Top-5 Accuracy")
+                axes[1, 0].set_xlabel("Epoch")
+                axes[1, 0].set_ylabel("Top-5 Accuracy")
                 axes[1, 0].legend()
 
             # Learning Rate
-            if 'lr-Adam' in df.columns:
-                lr_data = df.dropna(subset=['lr-Adam'])
-                axes[1, 1].plot(lr_data['epoch'], lr_data['lr-Adam'])
-                axes[1, 1].set_title('Learning Rate')
-                axes[1, 1].set_xlabel('Epoch')
-                axes[1, 1].set_ylabel('Learning Rate')
-                axes[1, 1].set_yscale('log')
+            if "lr-Adam" in df.columns:
+                lr_data = df.dropna(subset=["lr-Adam"])
+                axes[1, 1].plot(lr_data["epoch"], lr_data["lr-Adam"])
+                axes[1, 1].set_title("Learning Rate")
+                axes[1, 1].set_xlabel("Epoch")
+                axes[1, 1].set_ylabel("Learning Rate")
+                axes[1, 1].set_yscale("log")
 
             plt.tight_layout()
             plot_path = self.output_dir / "training_history.png"
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.savefig(plot_path, dpi=300, bbox_inches="tight")
             plt.close()
 
             logger.info(f"Saved training plots to {plot_path}")
@@ -470,7 +439,7 @@ class ImageNet64Trainer:
     def predict_sample(self, n_samples: int = 10) -> None:
         """
         Make predictions on sample images and visualize results.
-        
+
         Parameters
         ----------
         n_samples : int
@@ -494,29 +463,29 @@ class ImageNet64Trainer:
             predicted_classes = torch.argmax(predictions, dim=1)
 
         # Convert to numpy for plotting
-        x_batch = x_batch.cpu().numpy()
-        y_batch = y_batch.cpu().numpy()
-        predicted_classes = predicted_classes.cpu().numpy()
+        x_batch_np = x_batch.cpu().numpy()
+        y_batch_np = y_batch.cpu().numpy()
+        predicted_classes_np = predicted_classes.cpu().numpy()
 
         # Plot results
-        fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+        _fig, axes = plt.subplots(2, 5, figsize=(15, 6))
         axes = axes.ravel()
 
         for i in range(min(n_samples, 10)):
             # Display image (convert from CHW to HWC)
-            img = x_batch[i].transpose(1, 2, 0)
+            img = x_batch_np[i].transpose(1, 2, 0)
 
             # Denormalize if needed
             if img.max() <= 1.0:
                 img = np.clip(img, 0, 1)
 
             axes[i].imshow(img)
-            axes[i].set_title(f'True: {y_batch[i]}\nPred: {predicted_classes[i]}')
-            axes[i].axis('off')
+            axes[i].set_title(f"True: {y_batch_np[i]}\nPred: {predicted_classes_np[i]}")
+            axes[i].axis("off")
 
         plt.tight_layout()
         plot_path = self.output_dir / "sample_predictions.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
         plt.close()
 
         logger.info(f"Saved sample predictions to {plot_path}")
@@ -524,16 +493,16 @@ class ImageNet64Trainer:
 
 def load_config(config_path: str) -> dict[str, Any]:
     """Load configuration from JSON file."""
+    from typing import cast
+
     with open(config_path) as f:
-        return json.load(f)
+        data = json.load(f)
+    return cast(dict[str, Any], data)
 
 
 if __name__ == "__main__":
     # Example usage
-    model_config = {
-        "architecture": "simple",
-        "num_classes": 1000
-    }
+    model_config = {"architecture": "simple", "num_classes": 1000}
 
     training_config = {
         "batch_size": 32,
@@ -543,14 +512,11 @@ if __name__ == "__main__":
         "augmentation": True,
         "early_stopping": True,
         "patience": 10,
-        "num_workers": 4
+        "num_workers": 4,
     }
 
     trainer = ImageNet64Trainer(
-        data_path="data/imagenet64",
-        model_config=model_config,
-        training_config=training_config,
-        output_dir="outputs"
+        data_path="data/imagenet64", model_config=model_config, training_config=training_config, output_dir="outputs"
     )
 
     results = trainer.train()

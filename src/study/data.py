@@ -46,24 +46,28 @@ def get_augmentation_transforms(training: bool = True) -> transforms.Compose:
         Composed transforms
     """
     if training:
-        return transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.RandomRotation(20),
-            transforms.RandomHorizontalFlip(0.5),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.ToTensor(),
-        ])
+        return transforms.Compose(
+            [
+                transforms.ToPILImage(),
+                transforms.RandomRotation(20),
+                transforms.RandomHorizontalFlip(0.5),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+                transforms.ToTensor(),
+            ]
+        )
     else:
-        return transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-        ])
+        return transforms.Compose(
+            [
+                transforms.ToPILImage(),
+                transforms.ToTensor(),
+            ]
+        )
 
 
 class ImageNet64Dataset(Dataset):
     """
     PyTorch Dataset for ImageNet-64 data.
-    
+
     Parameters
     ----------
     data_path : str or Path
@@ -74,14 +78,14 @@ class ImageNet64Dataset(Dataset):
         Transforms to apply to images
     """
 
-    def __init__(self, data_path: str, split: str = 'train', transform: transforms.Compose | None = None):
+    def __init__(self, data_path: str | Path, split: str = "train", transform: transforms.Compose | None = None):
         self.data_path = Path(str(data_path))
         self.split = split
         self.transform = transform
 
-        if split == 'train':
+        if split == "train":
             self.images, self.labels = self._load_train_data()
-        elif split == 'test':
+        elif split == "test":
             self.images, self.labels = self._load_test_data()
         else:
             raise ValueError(f"Invalid split: {split}. Must be 'train' or 'test'")
@@ -93,17 +97,13 @@ class ImageNet64Dataset(Dataset):
     def _load_train_data(self) -> tuple[np.ndarray, np.ndarray]:
         """Load training data from pickle files."""
         train_files = os.listdir(self.data_path / "train_data")
-        x_train = []
-        y_train = []
+        x_train: list[np.ndarray] = []
+        y_train: list[np.ndarray] = []
 
         for train_file in tqdm(train_files, desc="Loading training data"):
             with open(self.data_path / "train_data" / train_file, "rb") as fo:
                 data = pickle.load(fo)
-                x = (
-                    data["data"]
-                    .reshape((data["data"].shape[0], 3, 64, 64))
-                    .transpose((0, 2, 3, 1))
-                )
+                x = data["data"].reshape((data["data"].shape[0], 3, 64, 64)).transpose((0, 2, 3, 1))
                 y = np.array(data["labels"]) - 1  # Convert to 0-based indexing
 
                 x_train.append(x)
@@ -118,11 +118,7 @@ class ImageNet64Dataset(Dataset):
         """Load test data from pickle file."""
         with open(self.data_path / "dev_data/dev_data_batch_1", "rb") as fo:
             data = pickle.load(fo)
-            x_test = (
-                data["data"]
-                .reshape((data["data"].shape[0], 3, 64, 64))
-                .transpose((0, 2, 3, 1))
-            )
+            x_test = data["data"].reshape((data["data"].shape[0], 3, 64, 64)).transpose((0, 2, 3, 1))
             y_test = np.array(data["labels"]) - 1  # Convert to 0-based indexing
 
         return x_test, y_test
@@ -159,8 +155,8 @@ class Imagenet64:
         self.data_path = Path(str(data_path))
 
         # Load all data into memory for legacy compatibility
-        train_dataset = ImageNet64Dataset(data_path, split='train')
-        test_dataset = ImageNet64Dataset(data_path, split='test')
+        train_dataset = ImageNet64Dataset(data_path, split="train")
+        test_dataset = ImageNet64Dataset(data_path, split="test")
 
         self.data = {
             "x_train": train_dataset.images,
@@ -169,20 +165,7 @@ class Imagenet64:
             "y_test": test_dataset.labels,
         }
 
-        # Validate data
+        # Validate data (basic sanity checks)
         n_classes = N_CLASSES
-        assert (
-            len(np.unique(self.data["y_train"])) <= n_classes and
-            len(np.unique(self.data["y_train"])) >= len(np.unique(self.data["y_test"]))
-        )
-
-
-if __name__ == "__main__":
-    ds = Imagenet64(
-        "path_to_data_folder",
-        n_decomposed_features=None,
-    )
-    dg = ds.datagen_cls(1024, augmentation=True)
-
-    for i in tqdm(range(1000)):
-        next(dg)
+        assert len(np.unique(self.data["y_train"])) <= n_classes
+        assert len(np.unique(self.data["y_train"])) >= len(np.unique(self.data["y_test"]))

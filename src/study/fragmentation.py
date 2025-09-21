@@ -55,13 +55,9 @@ class FragmentBatchDataset(Dataset):
         self._rng = rng
 
         exts = {".png", ".jpg", ".jpeg", ".bmp"}
-        self.image_paths: list[Path] = [
-            p for p in self.images_dir.rglob("*") if p.suffix.lower() in exts
-        ]
+        self.image_paths: list[Path] = [p for p in self.images_dir.rglob("*") if p.suffix.lower() in exts]
         if len(self.image_paths) == 0:
-            raise FileNotFoundError(
-                f"No images found under {self.images_dir}. Supported: {exts}"
-            )
+            raise FileNotFoundError(f"No images found under {self.images_dir}. Supported: {exts}")
 
     def __len__(self) -> int:
         return self.steps_per_epoch
@@ -76,7 +72,7 @@ class FragmentBatchDataset(Dataset):
         for src_id, path in enumerate(chosen):
             img = Image.open(path).convert("RGB")
             # Ensure 64x64
-            img = img.resize((64, 64), Image.BILINEAR)  # type: ignore[attr-defined]
+            img = img.resize((64, 64), Image.BILINEAR)
             if self.augment:
                 img = basic_augment(self._rng, img)
             patches = split_into_patches(img)
@@ -98,6 +94,7 @@ class FragmentBatchDataset(Dataset):
 # Module-level helpers
 # --------------------
 
+
 def split_into_patches(img: Image.Image) -> list[torch.Tensor]:
     """Split a 64x64 PIL image into a 4x4 grid of 16x16 patches as tensors [3,16,16]."""
     arr = np.asarray(img, dtype=np.uint8)
@@ -115,11 +112,12 @@ def split_into_patches(img: Image.Image) -> list[torch.Tensor]:
 def basic_augment(rng: np.random.RandomState, img: Image.Image) -> Image.Image:
     """Lightweight augmentation: horizontal flip p=0.5."""
     if rng.rand() < 0.5:
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)  # type: ignore[attr-defined]
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
     return img
 
     def _basic_augment(self, img: Image.Image) -> Image.Image:
         return basic_augment(self._rng, img)
+
 
 def collate_fragment_batch(batch: list[FragmentBatch]) -> FragmentBatch:
     # We expect DataLoader(batch_size=1). If larger, we merge.
@@ -130,10 +128,7 @@ def collate_fragment_batch(batch: list[FragmentBatch]) -> FragmentBatch:
 
 def _has_pickle_batches(dir_path: Path, split: str) -> bool:
     """Detect ImageNet-64 pickle batches inside the given split directory."""
-    if split == "train":
-        pattern = "train_data_batch_*"
-    else:
-        pattern = "dev_data_batch_*"
+    pattern = "train_data_batch_*" if split == "train" else "dev_data_batch_*"
     return any(dir_path.glob(pattern))
 
 
@@ -163,7 +158,7 @@ class FragmentBatchDatasetFromPickle(Dataset):
 
         # Load underlying dataset arrays
         split_name = "train" if split == "train" else "test"
-        self.ds = ImageNet64Dataset(self.base_dir, split=split_name, transform=None)
+        self.ds = ImageNet64Dataset(str(self.base_dir), split=split_name, transform=None)
         self.num_images = len(self.ds)
         if self.num_images <= 0:
             raise RuntimeError(f"No images found in batches under {self.base_dir} for split={split}")

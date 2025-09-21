@@ -25,5 +25,5 @@ __all__ = [
     "ImageNet64Trainer",
     "download_imagenet64",
     "setup_data_structure",
-    "create_sample_data"
+    "create_sample_data",
 ]

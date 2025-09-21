@@ -1,6 +1,7 @@
 """
 ImageNet-64 Dataset Download and Setup Utilities
 """
+
 import logging
 from pathlib import Path
 
@@ -8,23 +9,21 @@ logger = logging.getLogger(__name__)
 
 IMAGENET64_URLS = {
     "train": "https://image-net.org/data/downsample/Imagenet64_train.zip",
-    "val": "https://image-net.org/data/downsample/Imagenet64_val.zip"
+    "val": "https://image-net.org/data/downsample/Imagenet64_val.zip",
 }
 
-def download_imagenet64(
-    data_dir: str = "data/imagenet64",
-    subset: str = "both"
-) -> Path:
+
+def download_imagenet64(data_dir: str = "data/imagenet64", subset: str = "both") -> Path:
     """
     Download ImageNet-64 dataset.
-    
+
     Parameters
     ----------
     data_dir : str
         Directory to save the dataset
     subset : str
         Which subset to download: 'train', 'val', or 'both'
-        
+
     Returns
     -------
     Path
@@ -51,15 +50,16 @@ def download_imagenet64(
 
     return data_path
 
+
 def setup_data_structure(data_dir: str) -> bool:
     """
     Verify and setup the expected data structure.
-    
+
     Parameters
     ----------
     data_dir : str
         Path to the dataset directory
-        
+
     Returns
     -------
     bool
@@ -94,10 +94,11 @@ def setup_data_structure(data_dir: str) -> bool:
     logger.info(f"Found {len(train_files)} training files and {len(dev_files)} dev files")
     return True
 
+
 def create_sample_data(data_dir: str, n_samples: int = 1000) -> None:
     """
     Create sample data for testing (when real ImageNet-64 is not available).
-    
+
     Parameters
     ----------
     data_dir : str
@@ -119,23 +120,24 @@ def create_sample_data(data_dir: str, n_samples: int = 1000) -> None:
     # Create sample training data
     for i in range(3):  # 3 training batches
         sample_data = {
-            'data': np.random.randint(0, 256, (n_samples, 3*64*64), dtype=np.uint8),
-            'labels': np.random.randint(1, 1001, n_samples).tolist()
+            "data": np.random.randint(0, 256, (n_samples, 3 * 64 * 64), dtype=np.uint8),
+            "labels": np.random.randint(1, 1001, n_samples).tolist(),
         }
 
-        with open(train_dir / f"train_data_batch_{i+1}", "wb") as f:
+        with open(train_dir / f"train_data_batch_{i + 1}", "wb") as f:
             pickle.dump(sample_data, f)
 
     # Create sample dev data
     sample_dev_data = {
-        'data': np.random.randint(0, 256, (n_samples//10, 3*64*64), dtype=np.uint8),
-        'labels': np.random.randint(1, 1001, n_samples//10).tolist()
+        "data": np.random.randint(0, 256, (n_samples // 10, 3 * 64 * 64), dtype=np.uint8),
+        "labels": np.random.randint(1, 1001, n_samples // 10).tolist(),
     }
 
     with open(dev_dir / "dev_data_batch_1", "wb") as f:
         pickle.dump(sample_dev_data, f)
 
     logger.info(f"Created sample data in {data_path}")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

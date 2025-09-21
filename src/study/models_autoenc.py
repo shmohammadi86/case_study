@@ -27,7 +27,7 @@ class FragmentAutoencoder(nn.Module):
         self.dec = nn.Sequential(
             nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),  # 8x8
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),   # 16x16
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),  # 16x16
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 3, kernel_size=3, stride=1, padding=1),
             nn.Sigmoid(),
