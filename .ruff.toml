@@ -9,6 +9,9 @@ exclude = [
     "_build", "buck-out", "build", "dist", "node_modules", "site-packages", "venv",
     # Backup and archive directories
     "**/backup/**", "**/archive/**", "**/scratch/**",
+    # Project directories with generated or non-lintable content
+    "notebooks/**",
+    "outputs/**",
     "**/*_backup.py", "**/*_old.py", "**/*.deprecated",
 ]
 force-exclude = true
@@ -135,6 +138,15 @@ max-complexity = 15
 
 # Init files - allow unused imports and import issues
 "*/__init__.py" = ["F401", "F403", "E402", "I002"]
+"noxfile.py" = ["W291", "W293"]
+
+# Legacy modules (not in the new fragment pipeline); allow minor style issues
+"src/study/data.py" = ["PT018", "W293"]
+"src/study/download.py" = ["W293"]
+"src/study/models.py" = ["UP008", "W293"]
+"src/study/trainer.py" = ["W293"]
+"train_full.py" = ["UP008"]
+"test_real_data.py" = ["UP008"]
 
 # External/third-party code - ignore most rules
 "src/study/external/**" = ["ALL"]

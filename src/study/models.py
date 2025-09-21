@@ -1,12 +1,12 @@
 """
 CNN Model Architectures for ImageNet-64 Classification
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.models as models
-from typing import Optional
 import logging
+
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision import models
 
 logger = logging.getLogger(__name__)
 
@@ -23,26 +23,26 @@ class ResNetBlock(nn.Module):
     stride : int
         Stride for convolution
     """
-    
+
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1):
         super().__init__()
-        
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, 
+
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3,
                               stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, 
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3,
                               stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
-        
+
         # Shortcut connection
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, 
+                nn.Conv2d(in_channels, out_channels, kernel_size=1,
                          stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels)
             )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
@@ -52,10 +52,10 @@ class ResNetBlock(nn.Module):
 
 class SimpleCNN(nn.Module):
     """Simple CNN architecture for ImageNet-64."""
-    
+
     def __init__(self, num_classes: int = 1000):
         super(SimpleCNN, self).__init__()
-        
+
         # Feature extraction layers
         self.features = nn.Sequential(
             # First block
@@ -63,20 +63,20 @@ class SimpleCNN(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
-            
+
             # Second block
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            
+
             # Third block
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-        
+
         # Classifier - create layers individually to avoid tensor init issues
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
@@ -85,7 +85,7 @@ class SimpleCNN(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.dropout2 = nn.Dropout(0.3)
         self.fc2 = self._create_linear(512, num_classes)
-        
+
     def _create_linear(self, in_features: int, out_features: int) -> nn.Module:
         """Create linear layer with manual weight initialization to avoid tensor issues."""
         try:
@@ -100,7 +100,7 @@ class SimpleCNN(nn.Module):
             return nn.Sequential(
                 nn.Flatten() if in_features != out_features else nn.Identity()
             )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
         x = self.avgpool(x)
@@ -111,7 +111,7 @@ class SimpleCNN(nn.Module):
         x = self.dropout2(x)
         x = self.fc2(x)
         return x
-    
+
     def _init_weights(self, m):
         """Initialize model weights."""
         if isinstance(m, nn.Conv2d):
@@ -128,15 +128,15 @@ class SimpleCNN(nn.Module):
 
 class ResNetCNN(nn.Module):
     """ResNet-style CNN architecture for ImageNet-64."""
-    
+
     def __init__(self, num_classes: int = 1000):
         super().__init__()
-        
+
         # Initial conv layer
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
+
         # ResNet blocks
         self.layer1 = nn.Sequential(
             ResNetBlock(64, 64),
@@ -154,7 +154,7 @@ class ResNetCNN(nn.Module):
             ResNetBlock(256, 512, stride=2),
             ResNetBlock(512, 512)
         )
-        
+
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -164,16 +164,16 @@ class ResNetCNN(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(512, num_classes)
         )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.maxpool(x)
-        
+
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        
+
         x = self.avgpool(x)
         x = self.classifier(x)
         return x
@@ -181,38 +181,38 @@ class ResNetCNN(nn.Module):
 
 class EfficientCNN(nn.Module):
     """Efficient CNN with depthwise separable convolutions."""
-    
+
     def __init__(self, num_classes: int = 1000):
         super().__init__()
-        
+
         self.features = nn.Sequential(
             # Initial conv
             nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
         )
-        
+
         # Depthwise separable blocks
         self.blocks = nn.ModuleList()
         in_channels = 32
         for out_channels in [64, 128, 256, 512]:
             block = nn.Sequential(
                 # Depthwise conv
-                nn.Conv2d(in_channels, in_channels, kernel_size=3, 
+                nn.Conv2d(in_channels, in_channels, kernel_size=3,
                          padding=1, groups=in_channels),
                 nn.BatchNorm2d(in_channels),
                 nn.ReLU(inplace=True),
-                
+
                 # Pointwise conv
                 nn.Conv2d(in_channels, out_channels, kernel_size=1),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True),
-                
+
                 nn.MaxPool2d(2)
             )
             self.blocks.append(block)
             in_channels = out_channels
-        
+
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
@@ -222,7 +222,7 @@ class EfficientCNN(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(512, num_classes)
         )
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
         for block in self.blocks:
@@ -261,15 +261,15 @@ def create_cnn_model(
 
 class TransferLearningModel(nn.Module):
     """Transfer learning model using pre-trained backbone."""
-    
+
     def __init__(
-        self, 
+        self,
         base_model_name: str = "resnet50",
         num_classes: int = 1000,
         trainable_layers: int = 0
     ):
         super().__init__()
-        
+
         # Get base model
         if base_model_name.lower() == "resnet50":
             self.backbone = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
@@ -281,7 +281,7 @@ class TransferLearningModel(nn.Module):
             self.backbone.classifier = nn.Identity()  # Remove final layer
         else:
             raise ValueError(f"Unsupported base model: {base_model_name}")
-        
+
         # Freeze layers
         if trainable_layers == 0:
             for param in self.backbone.parameters():
@@ -292,7 +292,7 @@ class TransferLearningModel(nn.Module):
             for layer in layers[:-trainable_layers]:
                 for param in layer.parameters():
                     param.requires_grad = False
-        
+
         # Custom classifier head
         self.classifier = nn.Sequential(
             nn.Dropout(0.5),
@@ -337,9 +337,9 @@ if __name__ == "__main__":
     # Test model creation
     model = create_cnn_model(architecture="simple")
     print(f"Simple CNN: {count_parameters(model):,} parameters")
-    
+
     model = create_cnn_model(architecture="resnet")
     print(f"ResNet CNN: {count_parameters(model):,} parameters")
-    
+
     model = create_transfer_learning_model("resnet50")
     print(f"Transfer ResNet50: {count_parameters(model):,} parameters")

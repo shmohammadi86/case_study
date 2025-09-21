@@ -1,10 +1,10 @@
-import numpy as np
-from pathlib import Path
 import os
 import pickle
-from typing import Optional, Tuple
+from pathlib import Path
+
+import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -73,29 +73,29 @@ class ImageNet64Dataset(Dataset):
     transform : transforms.Compose, optional
         Transforms to apply to images
     """
-    
-    def __init__(self, data_path: str, split: str = 'train', transform: Optional[transforms.Compose] = None):
+
+    def __init__(self, data_path: str, split: str = 'train', transform: transforms.Compose | None = None):
         self.data_path = Path(str(data_path))
         self.split = split
         self.transform = transform
-        
+
         if split == 'train':
             self.images, self.labels = self._load_train_data()
         elif split == 'test':
             self.images, self.labels = self._load_test_data()
         else:
             raise ValueError(f"Invalid split: {split}. Must be 'train' or 'test'")
-            
+
         # Validate data
         assert len(self.images) == len(self.labels)
         assert len(np.unique(self.labels)) <= N_CLASSES
-        
-    def _load_train_data(self) -> Tuple[np.ndarray, np.ndarray]:
+
+    def _load_train_data(self) -> tuple[np.ndarray, np.ndarray]:
         """Load training data from pickle files."""
         train_files = os.listdir(self.data_path / "train_data")
         x_train = []
         y_train = []
-        
+
         for train_file in tqdm(train_files, desc="Loading training data"):
             with open(self.data_path / "train_data" / train_file, "rb") as fo:
                 data = pickle.load(fo)
@@ -105,16 +105,16 @@ class ImageNet64Dataset(Dataset):
                     .transpose((0, 2, 3, 1))
                 )
                 y = np.array(data["labels"]) - 1  # Convert to 0-based indexing
-                
+
                 x_train.append(x)
                 y_train.append(y)
-                
+
         x_train = np.concatenate(x_train, axis=0)
         y_train = np.concatenate(y_train, axis=0)
-        
+
         return x_train, y_train
-    
-    def _load_test_data(self) -> Tuple[np.ndarray, np.ndarray]:
+
+    def _load_test_data(self) -> tuple[np.ndarray, np.ndarray]:
         """Load test data from pickle file."""
         with open(self.data_path / "dev_data/dev_data_batch_1", "rb") as fo:
             data = pickle.load(fo)
@@ -124,28 +124,28 @@ class ImageNet64Dataset(Dataset):
                 .transpose((0, 2, 3, 1))
             )
             y_test = np.array(data["labels"]) - 1  # Convert to 0-based indexing
-            
+
         return x_test, y_test
-    
+
     def __len__(self) -> int:
         return len(self.labels)
-    
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         image = self.images[idx]
         label = self.labels[idx]
-        
+
         # Convert to uint8 for PIL compatibility
         image = image.astype(np.uint8)
-        
+
         if self.transform:
             image = self.transform(image)
         else:
             # Default: convert to tensor and normalize
             image = torch.from_numpy(image).float() / 255.0
             image = image.permute(2, 0, 1)  # HWC to CHW
-            
+
         label = torch.tensor(label, dtype=torch.long)
-        
+
         return image, label
 
 
@@ -154,21 +154,21 @@ class Imagenet64:
     Legacy wrapper class for backward compatibility.
     Use ImageNet64Dataset for new implementations.
     """
-    
+
     def __init__(self, data_path: str):
         self.data_path = Path(str(data_path))
-        
+
         # Load all data into memory for legacy compatibility
         train_dataset = ImageNet64Dataset(data_path, split='train')
         test_dataset = ImageNet64Dataset(data_path, split='test')
-        
+
         self.data = {
             "x_train": train_dataset.images,
             "y_train": train_dataset.labels,
             "x_test": test_dataset.images,
             "y_test": test_dataset.labels,
         }
-        
+
         # Validate data
         n_classes = N_CLASSES
         assert (

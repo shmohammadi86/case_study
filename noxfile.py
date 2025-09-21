@@ -1901,7 +1901,7 @@ def export_tutorials(session: nox.Session) -> None:
         session=session,
         extras=",".join(final_extras),
         additional_packages=[
-            "markdown", "pygments", "torch", "numpy", "pandas", 
+            "markdown", "pygments", "torch", "numpy", "pandas",
             "scikit-learn", "matplotlib"
         ],
         use_clean_env=False,
@@ -1911,7 +1911,7 @@ def export_tutorials(session: nox.Session) -> None:
     # Import the tutorial exporter
     sys.path.insert(0, str(Path("docs")))
     from tutorial_exporter import TutorialExporter
-    
+
     # Create exporter instance
     exporter = TutorialExporter()
 
@@ -1937,7 +1937,7 @@ def export_tutorials(session: nox.Session) -> None:
     success_count = 0
     for tutorial_file in tutorial_files:
         session.log(f"🔄 Creating notebook-style export for {tutorial_file.name}...")
-        
+
         try:
             base_name = tutorial_file.stem
             export_filename = f"{base_name}.md"
@@ -1945,21 +1945,21 @@ def export_tutorials(session: nox.Session) -> None:
 
             # Generate beautiful notebook content
             notebook_content = exporter.export_tutorial(tutorial_file, session)
-            
+
             # Write the professional markdown
             with open(export_path, "w", encoding="utf-8") as f:
                 f.write(notebook_content)
-            
+
             session.log(f"✅ Professional tutorial export created: {export_path}")
             success_count += 1
-            
+
         except Exception as e:
             session.log(f"❌ Error exporting {tutorial_file.name}: {e}")
             # Create a fallback export
             fallback_content = f"# {tutorial_file.stem.replace('_', ' ').title()}\n\nError creating tutorial: {e}"
             with open(export_path, "w", encoding="utf-8") as f:
                 f.write(fallback_content)
-        
+
         session.log("")
 
     session.log(f"🎉 Tutorial export completed! Successfully exported {success_count}/{len(tutorial_files)} tutorials")
@@ -3166,7 +3166,7 @@ def typing(session: nox.Session) -> None:
     is_ci = os.getenv("CI") == "true" or os.getenv("GITLAB_CI") == "true"
 
     session.log(f"🔧 Environment: {'CI/CD' if is_ci else 'Local'} → extras: {extras}")
-    
+
     # Show which tools will be run
     tools = []
     if run_pyright:
@@ -3193,24 +3193,24 @@ def typing(session: nox.Session) -> None:
     # Run pyright with enhanced options
     if run_pyright:
         session.log("🔍 Running pyright type checking...")
-        
+
         # Check for pyright-specific arguments
         pyright_args = []
         show_stats = '--stats' in args
         errors_only = '--errors-only' in args
-        
+
         if show_stats:
             pyright_args.append('--stats')
         if errors_only:
             session.log("⚡ Running in errors-only mode (faster, shows only critical issues)")
-        
+
         try:
             cmd = ["pyright", "src/study", "--pythonpath", "src"]
-            
+
             # Add tests only if not in errors-only mode (tests have many issues)
             if not errors_only:
                 cmd.append("tests")
-            
+
             cmd.extend(pyright_args)
             session.run(*cmd)
             results['pyright'] = '✅ PASSED'
@@ -3220,7 +3220,7 @@ def typing(session: nox.Session) -> None:
             session.log(f"❌ pyright failed: {e}")
             if not (run_mypy or run_typos):  # Only fail if this is the only tool
                 raise
-    
+
     # Run mypy
     if run_mypy:
         session.log("🔍 Running mypy type checking...")
@@ -4037,44 +4037,43 @@ def create_experiment(session: nox.Session) -> None:
         EXPERIMENT_NAME: Name of the experiment (e.g., K562_finetuning)
         --type: Type of experiment (hyperopt, finetuning, benchmark, analysis)
     """
-    import shutil
     import json
     from datetime import datetime
-    
+
     # Try to import yaml, fallback to json if not available
     try:
         import yaml
         use_yaml = True
     except ImportError:
         use_yaml = False
-    
+
     if not session.posargs:
         session.error("❌ Please provide experiment name: nox -s create-experiment -- EXPERIMENT_NAME")
-    
+
     experiment_name = session.posargs[0]
     experiment_type = "finetuning"  # default
-    
+
     # Parse optional type argument
     for arg in session.posargs[1:]:
         if arg.startswith("--type="):
             experiment_type = arg.split("=")[1]
-    
+
     # Validate experiment name
     if not experiment_name.replace("_", "").replace("-", "").isalnum():
         session.error(f"❌ Invalid experiment name: {experiment_name}. Use alphanumeric characters, underscores, and hyphens only.")
-    
+
     # Create experiment directory
     exp_dir = PROJECT_ROOT / "experiments" / experiment_name
     if exp_dir.exists():
         session.error(f"❌ Experiment directory already exists: {exp_dir}")
-    
+
     session.log(f"🧪 Creating experiment: {experiment_name} (type: {experiment_type})")
-    
+
     # Create directory structure
     directories = ["config", "scripts", "logs", "results", "checkpoints", "docs"]
     for dir_name in directories:
         (exp_dir / dir_name).mkdir(parents=True, exist_ok=True)
-    
+
     # Create config templates based on experiment type
     config_templates = {
         "hyperopt": {
@@ -4150,7 +4149,7 @@ def create_experiment(session: nox.Session) -> None:
             }
         }
     }
-    
+
     # Write config files
     configs = config_templates.get(experiment_type, config_templates["finetuning"])
     for filename, config_data in configs.items():
@@ -4159,13 +4158,13 @@ def create_experiment(session: nox.Session) -> None:
         else:
             # Use JSON if YAML not available
             config_path = exp_dir / "config" / filename.replace(".yaml", ".json")
-        
+
         with open(config_path, "w") as f:
             if use_yaml:
                 yaml.dump(config_data, f, default_flow_style=False, indent=2)
             else:
                 json.dump(config_data, f, indent=2)
-    
+
     # Create README.md template
     readme_template = f"""# {experiment_name.replace('_', ' ').title()}
 
@@ -4228,10 +4227,10 @@ Logs and checkpoints are automatically saved during training.
 - [ ] Full experiment execution
 - [ ] Results analysis and documentation
 """
-    
+
     with open(exp_dir / "README.md", "w") as f:
         f.write(readme_template)
-    
+
     # Create basic script templates
     train_script_template = f"""#!/usr/bin/env python3
 \"\"\"Training script for {experiment_name} experiment.\"\"\"
@@ -4251,15 +4250,15 @@ def main():
 if __name__ == "__main__":
     main()
 """
-    
+
     with open(exp_dir / "scripts" / "train.py", "w") as f:
         f.write(train_script_template)
-    
+
     # Make script executable
     (exp_dir / "scripts" / "train.py").chmod(0o755)
-    
+
     session.log(f"✅ Experiment created successfully at: {exp_dir}")
-    session.log(f"📁 Directory structure:")
+    session.log("📁 Directory structure:")
     for item in sorted(exp_dir.rglob("*")):
         if item.is_file():
             rel_path = item.relative_to(exp_dir)
@@ -4267,12 +4266,12 @@ if __name__ == "__main__":
         elif item != exp_dir:
             rel_path = item.relative_to(exp_dir)
             session.log(f"   📁 {rel_path}/")
-    
-    session.log(f"\n🎯 Next steps:")
+
+    session.log("\n🎯 Next steps:")
     session.log(f"   1. cd experiments/{experiment_name}")
-    session.log(f"   2. Edit config files in config/ directory")
-    session.log(f"   3. Implement scripts in scripts/ directory")
-    session.log(f"   4. Run your experiment!")
+    session.log("   2. Edit config files in config/ directory")
+    session.log("   3. Implement scripts in scripts/ directory")
+    session.log("   4. Run your experiment!")
 
 
 if __name__ == "__main__":

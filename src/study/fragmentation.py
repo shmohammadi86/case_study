@@ -3,12 +3,12 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
-from PIL import Image
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
+
 from .data import ImageNet64Dataset
 
 
@@ -55,7 +55,7 @@ class FragmentBatchDataset(Dataset):
         self._rng = rng
 
         exts = {".png", ".jpg", ".jpeg", ".bmp"}
-        self.image_paths: List[Path] = [
+        self.image_paths: list[Path] = [
             p for p in self.images_dir.rglob("*") if p.suffix.lower() in exts
         ]
         if len(self.image_paths) == 0:
@@ -71,12 +71,12 @@ class FragmentBatchDataset(Dataset):
         idxs = self._rng.choice(len(self.image_paths), size=self.images_per_sample, replace=False)
         chosen = [self.image_paths[i] for i in idxs]
 
-        fragments: List[torch.Tensor] = []
-        labels: List[int] = []
+        fragments: list[torch.Tensor] = []
+        labels: list[int] = []
         for src_id, path in enumerate(chosen):
             img = Image.open(path).convert("RGB")
             # Ensure 64x64
-            img = img.resize((64, 64), Image.BILINEAR)
+            img = img.resize((64, 64), Image.BILINEAR)  # type: ignore[attr-defined]
             if self.augment:
                 img = basic_augment(self._rng, img)
             patches = split_into_patches(img)
@@ -98,10 +98,10 @@ class FragmentBatchDataset(Dataset):
 # Module-level helpers
 # --------------------
 
-def split_into_patches(img: Image.Image) -> List[torch.Tensor]:
+def split_into_patches(img: Image.Image) -> list[torch.Tensor]:
     """Split a 64x64 PIL image into a 4x4 grid of 16x16 patches as tensors [3,16,16]."""
     arr = np.asarray(img, dtype=np.uint8)
-    patches: List[torch.Tensor] = []
+    patches: list[torch.Tensor] = []
     for ry in range(4):
         for rx in range(4):
             patch = arr[ry * 16 : (ry + 1) * 16, rx * 16 : (rx + 1) * 16, :]
@@ -115,13 +115,13 @@ def split_into_patches(img: Image.Image) -> List[torch.Tensor]:
 def basic_augment(rng: np.random.RandomState, img: Image.Image) -> Image.Image:
     """Lightweight augmentation: horizontal flip p=0.5."""
     if rng.rand() < 0.5:
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)  # type: ignore[attr-defined]
     return img
 
     def _basic_augment(self, img: Image.Image) -> Image.Image:
         return basic_augment(self._rng, img)
 
-def collate_fragment_batch(batch: List[FragmentBatch]) -> FragmentBatch:
+def collate_fragment_batch(batch: list[FragmentBatch]) -> FragmentBatch:
     # We expect DataLoader(batch_size=1). If larger, we merge.
     frags = torch.cat([b.fragments for b in batch], dim=0)
     labels = torch.cat([b.source_ids for b in batch], dim=0)
@@ -174,8 +174,8 @@ class FragmentBatchDatasetFromPickle(Dataset):
     def __getitem__(self, idx: int) -> FragmentBatch:
         # sample N distinct indices
         idxs = self._rng.choice(self.num_images, size=self.images_per_sample, replace=False)
-        fragments: List[torch.Tensor] = []
-        labels: List[int] = []
+        fragments: list[torch.Tensor] = []
+        labels: list[int] = []
         for sid, i in enumerate(idxs):
             img_np, _ = self.ds.images[i], self.ds.labels[i]
             # ensure PIL image for augmentation & resizing safety

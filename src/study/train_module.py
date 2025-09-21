@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import pytorch_lightning as pl
+import torch
+from torch import nn, optim
 
-from .models_autoenc import FragmentAutoencoder
 from .fragmentation import FragmentBatch
+from .models_autoenc import FragmentAutoencoder
 
 
 class FragmentAE(pl.LightningModule):

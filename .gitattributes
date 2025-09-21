@@ -1,3 +1,6 @@
-data/** filter=lfs diff=lfs merge=lfs -text
+# Track all artifacts under outputs/ with Git LFS
 outputs/** filter=lfs diff=lfs merge=lfs -text
+
+# Also track large checkpoints anywhere
 *.ckpt filter=lfs diff=lfs merge=lfs -text
+data/** filter=lfs diff=lfs merge=lfs -text
