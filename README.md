@@ -6,7 +6,7 @@ This repository implements a minimal, self-supervised pipeline that groups unord
 
 - Minimal Python modules under `src/study/` for data loading, fragment generation, and the model.
 - A single public notebook with the full workflow (training, CPU-centric evaluation, baselines, visualization):
-  - `notebooks/fragment_reconstruction_pipeline.ipynb`
+  - `experiments/notebooks/fragment_reconstruction_pipeline.ipynb`
 - Final artifacts tracked with Git LFS:
   - `outputs/fragment_clustering_baseline/results/metrics.json`
   - `outputs/fragment_clustering_baseline/results/visualization_real.png`
@@ -76,8 +76,8 @@ data/
 
 ## Results & Report
 
-- Final report: `docs/REPORT.md`
-- Notebook: `notebooks/fragment_reconstruction_pipeline.ipynb`
+- Final report: `experiments/docs/final_report.md`
+- Notebook: `experiments/notebooks/fragment_reconstruction_pipeline.ipynb`
 - Artifacts:
   - Metrics (ARI, NMI, Purity): `outputs/fragment_clustering_baseline/results/metrics.json`
   - Visualization (predicted vs. true groups): `outputs/fragment_clustering_baseline/results/visualization_real.png`
