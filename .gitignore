@@ -52,8 +52,6 @@ test-reports/
 
 
 # Jupyter and notebooks
-docs/design/old
-notebooks/old
 .ipynb_checkpoints/
 
 # Logs and debug
@@ -87,8 +85,7 @@ version.env
 output/
 __marimo__/
 
-# Experiment data (should not be tracked)
-experiments/shared/data/
+# Experiment backups (should not be tracked)
 experiments/backup/
 
 # External repos
@@ -110,6 +107,7 @@ docs/_build/
 
 # Allow tutorial templates to be tracked
 !scratch/docs/templates/**
- 
-# Ensure data/ is tracked (overrides global extension ignores)
-!data/**
+
+# Ensure experiments/data/ is tracked (overrides global extension ignores)
+!experiments/data/**
+!experiments/checkpoints/**

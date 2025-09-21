@@ -5,15 +5,13 @@ This repository implements a minimal, self-supervised pipeline that groups unord
 ## What’s included
 
 - Minimal Python modules under `src/study/` for data loading, fragment generation, and the model.
-- A single public notebook with the full workflow (training, CPU-centric evaluation, baselines, visualization):
-  - `experiments/notebooks/fragment_reconstruction_pipeline.ipynb`
-- Final artifacts tracked with Git LFS:
-  - `outputs/fragment_clustering_baseline/results/metrics.json`
-  - `outputs/fragment_clustering_baseline/results/visualization_real.png`
+- A CPU-friendly evaluation notebook showing how to load checkpoints and run validation:
+  - `experiments/notebooks/evaluation.ipynb`
+- Final artifacts: generated locally under `experiments/figures/` after running the evaluation script.
 
 ## Git LFS setup (required for data and checkpoints)
 
-This repository stores large files (datasets in `data/`, outputs/artifacts in `outputs/`, and `*.ckpt` checkpoints) using Git LFS. You must install and enable Git LFS to fetch these files correctly.
+This repository stores large files (datasets in `experiments/data/`, checkpoints in `experiments/checkpoints/`, and `*.ckpt` files) using Git LFS. You must install and enable Git LFS to fetch these files correctly.
 
 1) Install Git LFS (one-time):
 
@@ -66,10 +64,10 @@ The pipeline expects the legacy ImageNet-64 pickle batches at:
 ```
 The code auto-detects this format and loads it without modification.
 
-Local layout tip (optional): you may symlink or copy your data into the repository under `data/` so the examples work out-of-the-box:
+Local layout tip (optional): you may symlink or copy your data into the repository under `experiments/data/` so the examples work out-of-the-box:
 
 ```text
-data/
+experiments/data/
 ├── train_data/
 └── dev_data/
 ```
@@ -77,10 +75,9 @@ data/
 ## Results & Report
 
 - Final report: `experiments/docs/final_report.md`
-- Notebook: `experiments/notebooks/fragment_reconstruction_pipeline.ipynb`
+- Notebook: `experiments/notebooks/evaluation.ipynb`
 - Artifacts:
-  - Metrics (ARI, NMI, Purity): `outputs/fragment_clustering_baseline/results/metrics.json`
-  - Visualization (predicted vs. true groups): `outputs/fragment_clustering_baseline/results/visualization_real.png`
+  - Figures (e.g., t-SNE true vs. predicted clusters): saved under `experiments/figures/` by `experiments/scripts/evaluate_figures.py`.
 
 ## Inference / Validation (CPU friendly)
 
@@ -88,7 +85,7 @@ You can run evaluation on CPU either via the notebook or a minimal Python script
 
 1) Notebook (recommended for exploration)
 
-- Open `experiments/notebooks/fragment_reconstruction_pipeline.ipynb` in Jupyter or VS Code.
+- Open `experiments/notebooks/evaluation.ipynb` in Jupyter or VS Code.
 - Ensure you have the environment installed (see `requirements.txt` and `pyproject.toml`).
 - The notebook demonstrates loading data, training (optional), and CPU-friendly evaluation and visualization.
 
@@ -103,8 +100,8 @@ from pathlib import Path
 from src.study.trainer import FragmentAutoencoderTrainer
 
 # Paths
-data_path = "data/dev_data"  # or "data/train_data" for a larger run
-checkpoint_path = Path("outputs/conv_autoencoder/checkpoints")
+data_path = "experiments/data/dev_data"  # or "experiments/data/train_data" for a larger run
+checkpoint_path = Path("experiments/checkpoints/conv_autoencoder")
 
 # Find the best checkpoint (pattern created by ModelCheckpoint callback)
 ckpts = sorted(checkpoint_path.glob("best_model-*.ckpt"))
@@ -136,6 +133,18 @@ Notes:
 - Checkpoints are saved under `outputs/<model_name>/checkpoints/` by the Lightning `ModelCheckpoint` callback configured in `FragmentAutoencoderTrainer.configure_callbacks()`.
 - To reproduce a quick run end-to-end on CPU, you can also run the training script:
   - `python experiments/scripts/train.py --data-path data/train_data --output-dir outputs/conv_autoencoder`
+
+3) Generate evaluation figures (CPU)
+
+- Use the helper script to produce t-SNE plots of embeddings colored by true vs. predicted clusters:
+
+```bash
+python experiments/scripts/evaluate_figures.py \
+  --data-path data/dev_data \
+  --checkpoint-dir outputs/conv_autoencoder/checkpoints \
+  --output-dir experiments/figures \
+  --images-per-batch 10
+```
 
 ## Notes
 

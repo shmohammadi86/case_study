@@ -4,8 +4,8 @@ CLI entrypoint for full training using FragmentAutoencoderTrainer.
 
 Example:
     python train.py \
-      --data-path data/train_data \
-      --output-dir outputs/conv_autoencoder \
+      --data-path experiments/data/train_data \
+      --output-dir experiments/checkpoints/conv_autoencoder \
       --model-type conv \
       --images-per-batch 10 --batch-size 64 --epochs 50 \
       --steps-per-epoch 1000 --num-workers 8
@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train fragment autoencoder/classifier")
     # data and io
     p.add_argument("--data-path", type=str, required=True, help="Path to train/val data directory")
-    p.add_argument("--output-dir", type=str, default="outputs/conv_autoencoder", help="Output directory")
+    p.add_argument("--output-dir", type=str, default="experiments/checkpoints/conv_autoencoder", help="Output directory")
 
     # model config
     p.add_argument("--model-type", type=str, default="conv", choices=["conv", "linear", "pca", "supervised"],
